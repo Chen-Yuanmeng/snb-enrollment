@@ -1,0 +1,100 @@
+{
+  "$spec": "grade-pricing-rules.v2-lite",
+  "$spec_version": "1.0.0",
+  "grade": "五一中考",
+  "enabled": true,
+  "class_modes": [
+    "线下",
+    "线上"
+  ],
+  "class_subject_groups": [
+    [
+      {
+        "name": "高新 道德与法治",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "高新 历史",
+        "pricing_strategy": "default"
+      }
+    ],
+    [
+      {
+        "name": "高新 语文",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "高新 数学",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "高新 物理",
+        "pricing_strategy": "default"
+      }
+    ],
+    [
+      {
+        "name": "中原 道德与法治",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "中原 历史",
+        "pricing_strategy": "default"
+      }
+    ]
+  ],
+  "constraints": {
+    "selection_mode": "multiple",
+    "max_select": null,
+    "mixed_mode": {
+      "allowed": true,
+      "split_keys": [
+        "offline_subjects",
+        "online_subjects"
+      ],
+      "require_cover_all_selected": true,
+      "forbid_overlap": true
+    }
+  },
+  "discount_presets": {
+    "wuyi_core": [
+      {
+        "name": "三人成团",
+        "enabled": true,
+        "strategy": "per_subject_amount",
+        "value": 100
+      }
+    ]
+  },
+  "pricing": {
+    "default": {
+      "price_type": "per_subject_by_mode",
+      "offline_per_subject": 800,
+      "online_per_subject": 800,
+      "discount_preset_refs": [
+        "wuyi_core"
+      ],
+      "available_discounts_overrides": []
+    }
+  },
+  "discounts": [
+    {
+      "name": "三人成团",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "manual"
+    }
+  ],
+  "quote_validity": {
+    "strategy": "fixed",
+    "params": {
+      "fixed_until": "2026-12-31T23:59:59"
+    }
+  },
+  "ui_hints": {
+    "notes": [],
+    "discount_labels": {
+      "三人成团": "三人成团（每项减100）"
+    }
+  }
+}

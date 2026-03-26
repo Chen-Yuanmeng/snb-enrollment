@@ -1,0 +1,37 @@
+{
+  "version": "2026.03.26",
+  "timezone": "Asia/Shanghai",
+  "default_quote_valid_minutes": 30,
+  "grades": [
+    {
+      "grade": "4.18-19初中道法",
+      "file": "grades/g4_18_ethics.json",
+      "enabled": true
+    },
+    {
+      "grade": "五一中考",
+      "file": "grades/wuyi_exam.json",
+      "enabled": true
+    },
+    {
+      "grade": "新高一暑期",
+      "file": "grades/s1_summer.json",
+      "enabled": true
+    },
+    {
+      "grade": "新高二暑期",
+      "file": "grades/s2_summer.json",
+      "enabled": true
+    },
+    {
+      "grade": "新高三暑期",
+      "file": "grades/s3_summer.json",
+      "enabled": true
+    },
+    {
+      "grade": "初中/小学暑期",
+      "file": "grades/junior_primary_summer.json",
+      "enabled": true
+    }
+  ]
+}

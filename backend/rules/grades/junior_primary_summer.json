@@ -1,0 +1,188 @@
+{
+  "$spec": "grade-pricing-rules.v2-lite",
+  "$spec_version": "1.0.0",
+  "grade": "初中/小学暑期",
+  "enabled": true,
+  "class_modes": [
+    "线下",
+    "线上",
+    "混合"
+  ],
+  "class_subject_groups": [
+    [
+      {
+        "name": "寒开英才数学",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "寒开英才物理",
+        "pricing_strategy": "default"
+      }
+    ],
+    [
+      {
+        "name": "暑开英才数学",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "暑开英才物理",
+        "pricing_strategy": "default"
+      }
+    ],
+    [
+      {
+        "name": "新七数学",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "新八数学",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "新七/八物理",
+        "pricing_strategy": "default"
+      }
+    ],
+    [
+      {
+        "name": "新九数学",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "新九物理",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "新九化学",
+        "pricing_strategy": "default"
+      }
+    ],
+    [
+      {
+        "name": "初中语文",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "中考语文",
+        "pricing_strategy": "default"
+      }
+    ],
+    [
+      {
+        "name": "中考英语",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "原版英语 (EIM 1)",
+        "pricing_strategy": "special_eim"
+      }
+    ]
+  ],
+  "constraints": {
+    "selection_mode": "multiple",
+    "max_select": null,
+    "mixed_mode": {
+      "allowed": true,
+      "split_keys": [
+        "offline_subjects",
+        "online_subjects"
+      ],
+      "require_cover_all_selected": true,
+      "forbid_overlap": true
+    }
+  },
+  "discount_presets": {
+    "jp_core": [
+      {
+        "name": "老带新",
+        "enabled": true,
+        "strategy": "per_subject_amount",
+        "value": 100
+      },
+      {
+        "name": "转发朋友圈",
+        "enabled": true,
+        "strategy": "per_subject_amount",
+        "value": 100
+      },
+      {
+        "name": "老生续报",
+        "enabled": true,
+        "strategy": "per_subject_amount",
+        "value": 100
+      },
+      {
+        "name": "现金优惠",
+        "enabled": true,
+        "strategy": "per_subject_amount",
+        "value": 100
+      }
+    ]
+  },
+  "pricing": {
+    "default": {
+      "price_type": "per_subject_by_mode",
+      "offline_per_subject": 5040,
+      "online_per_subject": 4480,
+      "discount_preset_refs": [
+        "jp_core"
+      ],
+      "available_discounts_overrides": []
+    },
+    "special_eim": {
+      "price_type": "fixed_total",
+      "total": 6720,
+      "discount_preset_refs": [
+        "jp_core"
+      ],
+      "available_discounts_overrides": []
+    }
+  },
+  "discounts": [
+    {
+      "name": "老带新",
+      "requires_history_student": true,
+      "exclusive_with": [
+        "老生续报"
+      ],
+      "mode": "manual"
+    },
+    {
+      "name": "转发朋友圈",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "manual"
+    },
+    {
+      "name": "老生续报",
+      "requires_history_student": true,
+      "exclusive_with": [
+        "老带新"
+      ],
+      "mode": "auto"
+    },
+    {
+      "name": "现金优惠",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "manual"
+    }
+  ],
+  "quote_validity": {
+    "strategy": "fixed",
+    "params": {
+      "fixed_until": "2026-12-31T23:59:59"
+    }
+  },
+  "ui_hints": {
+    "notes": [
+      "全勤奖提示: 28天课程每科结课后可返100元"
+    ],
+    "discount_labels": {
+      "老带新": "老带新",
+      "转发朋友圈": "转发朋友圈",
+      "老生续报": "老生续报",
+      "现金优惠": "现金优惠"
+    }
+  }
+}

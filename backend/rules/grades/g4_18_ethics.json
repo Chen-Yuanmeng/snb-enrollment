@@ -1,0 +1,62 @@
+{
+  "$spec": "grade-pricing-rules.v2-lite",
+  "$spec_version": "1.0.0",
+  "grade": "道法押题",
+  "enabled": true,
+  "class_modes": [
+    "线下",
+    "线上"
+  ],
+  "class_subject_groups": [
+    [
+      {
+        "name": "中原",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "高新",
+        "pricing_strategy": "default"
+      }
+    ]
+  ],
+  "constraints": {
+    "selection_mode": "multiple",
+    "max_select": null,
+    "mixed_mode": {
+      "allowed": false,
+      "split_keys": [
+        "offline_subjects",
+        "online_subjects"
+      ],
+      "require_cover_all_selected": true,
+      "forbid_overlap": true
+    }
+  },
+  "discount_presets": {
+    "g4_core": []
+  },
+  "pricing": {
+    "default": {
+      "price_type": "per_subject_by_mode",
+      "offline_per_subject": 400,
+      "online_per_subject": 400,
+      "discount_preset_refs": [
+        "g4_core"
+      ],
+      "available_discounts_overrides": []
+    }
+  },
+  "discounts": [],
+  "quote_validity": {
+    "strategy": "fixed",
+    "params": {
+      "fixed_until": "2026-12-31T23:59:59"
+    }
+  },
+  "ui_hints": {
+    "notes": [
+      "固定收费400元/项"
+    ],
+    "discount_labels": {}
+  }
+}

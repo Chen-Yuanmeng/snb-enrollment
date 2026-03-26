@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RulesIndex",
+  "type": "object",
+  "required": ["version", "timezone", "default_quote_valid_minutes", "grades"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "timezone": { "type": "string", "minLength": 1 },
+    "default_quote_valid_minutes": { "type": "integer", "minimum": 1 },
+    "grades": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["grade", "file", "enabled"],
+        "properties": {
+          "grade": { "type": "string", "minLength": 1 },
+          "file": { "type": "string", "minLength": 1 },
+          "enabled": { "type": "boolean" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

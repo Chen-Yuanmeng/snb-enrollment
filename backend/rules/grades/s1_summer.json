@@ -1,0 +1,317 @@
+{
+  "$spec": "grade-pricing-rules.v2-lite",
+  "$spec_version": "1.0.0",
+  "grade": "新高一暑",
+  "enabled": true,
+  "class_modes": [
+    "线下",
+    "线上"
+  ],
+  "class_subject_groups": [
+    [
+      {
+        "name": "高新英才",
+        "pricing_strategy": "yingcai"
+      },
+      {
+        "name": "高新领军1",
+        "pricing_strategy": "lingjun28"
+      },
+      {
+        "name": "高新领军2",
+        "pricing_strategy": "lingjun21"
+      }
+    ],
+    [
+      {
+        "name": "高新领军3",
+        "pricing_strategy": "lingjun28"
+      },
+      {
+        "name": "高新领军4",
+        "pricing_strategy": "lingjun21"
+      },
+      {
+        "name": "高新卓越1",
+        "pricing_strategy": "lingjun28"
+      }
+    ],
+    [
+      {
+        "name": "高新二期领军5",
+        "pricing_strategy": "lingjun21"
+      },
+      {
+        "name": "高新二期卓越2",
+        "pricing_strategy": "lingjun21"
+      }
+    ],
+    [
+      {
+        "name": "中原领军1",
+        "pricing_strategy": "lingjun21"
+      },
+      {
+        "name": "中原领军1 (无语英)",
+        "pricing_strategy": "lingjun21nocnen"
+      }
+    ],
+    [
+      {
+        "name": "中原领军4",
+        "pricing_strategy": "lingjun21"
+      },
+      {
+        "name": "中原领军4 (无语英)",
+        "pricing_strategy": "lingjun21nocnen"
+      }
+    ]
+  ],
+  "constraints": {
+    "selection_mode": "single",
+    "max_select": 1,
+    "mixed_mode": {
+      "allowed": false,
+      "split_keys": [
+        "offline_subjects",
+        "online_subjects"
+      ],
+      "require_cover_all_selected": true,
+      "forbid_overlap": true
+    }
+  },
+  "discount_presets": {
+    "core_common": [
+      {
+        "name": "老带新",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 400
+      },
+      {
+        "name": "优秀生第一档",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 1000
+      },
+      {
+        "name": "优秀生第二档",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 800
+      },
+      {
+        "name": "优秀生第三档",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 600
+      },
+      {
+        "name": "优秀生第四档",
+        "enabled": true,
+        "strategy": "from_input",
+        "params": {
+          "min_value": 0,
+          "max_value": 600,
+          "placeholder": "请输入优秀生优惠金额"
+        }
+      },
+      {
+        "name": "五一报名优惠",
+        "enabled": true,
+        "strategy": "from_input_multiple_of",
+        "params": {
+          "multiple_of": 100,
+          "min_value": 0
+        }
+      }
+    ],
+    "moment_300": [
+      {
+        "name": "转发朋友圈",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 300
+      }
+    ],
+    "moment_400": [
+      {
+        "name": "转发朋友圈",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 400
+      }
+    ],
+    "early_bird_300_150": [
+      {
+        "name": "早鸟",
+        "enabled": true,
+        "strategy": "time_staged",
+        "params": {
+          "stages": [
+            {
+              "name": "第一阶段",
+              "time_start": "2026-03-01T00:00:00",
+              "time_end": "2026-05-15T23:59:59",
+              "value": 300
+            },
+            {
+              "name": "第二阶段",
+              "time_start": "2026-05-16T00:00:00",
+              "time_end": "2026-06-15T23:59:59",
+              "value": 150
+            }
+          ]
+        }
+      }
+    ],
+    "early_bird_400_200": [
+      {
+        "name": "早鸟",
+        "enabled": true,
+        "strategy": "time_staged",
+        "params": {
+          "stages": [
+            {
+              "name": "第一阶段",
+              "time_start": "2026-03-01T00:00:00",
+              "time_end": "2026-05-15T23:59:59",
+              "value": 400
+            },
+            {
+              "name": "第二阶段",
+              "time_start": "2026-05-16T00:00:00",
+              "time_end": "2026-06-15T23:59:59",
+              "value": 200
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "pricing": {
+    "yingcai": {
+      "price_type": "fixed_total_by_mode",
+      "offline_total": 20160,
+      "online_total": 17920,
+      "offline_equation": "270*28*2 (数学物理) + 180*28 (化学)",
+      "online_equation": "240*28*2 (数学物理) + 160*28 (化学)",
+      "discount_preset_refs": [
+        "core_common",
+        "moment_300",
+        "early_bird_300_150"
+      ],
+      "available_discounts_overrides": []
+    },
+    "lingjun28": {
+      "price_type": "fixed_total_by_mode",
+      "offline_total": 20160,
+      "online_total": 17920,
+      "offline_equation": "180*4*28",
+      "online_equation": "160*4*28",
+      "discount_preset_refs": [
+        "core_common",
+        "moment_400",
+        "early_bird_400_200"
+      ],
+      "available_discounts_overrides": []
+    },
+    "lingjun21": {
+      "price_type": "fixed_total_by_mode",
+      "offline_total": 15120,
+      "online_total": 13440,
+      "offline_equation": "180*4*21",
+      "online_equation": "160*4*21",
+      "discount_preset_refs": [
+        "core_common",
+        "moment_300",
+        "early_bird_300_150"
+      ],
+      "available_discounts_overrides": []
+    },
+    "lingjun21nocnen": {
+      "price_type": "fixed_total_by_mode",
+      "offline_total": 11340,
+      "online_total": 10080,
+      "offline_equation": "180*3*21",
+      "online_equation": "160*3*21",
+      "discount_preset_refs": [
+        "core_common",
+        "moment_300",
+        "early_bird_300_150"
+      ],
+      "available_discounts_overrides": []
+    }
+  },
+  "discounts": [
+    {
+      "name": "老带新",
+      "requires_history_student": true,
+      "exclusive_with": [],
+      "mode": "manual"
+    },
+    {
+      "name": "优秀生第一档",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "manual"
+    },
+    {
+      "name": "优秀生第二档",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "manual"
+    },
+    {
+      "name": "优秀生第三档",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "manual"
+    },
+    {
+      "name": "优秀生第四档",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "manual"
+    },
+    {
+      "name": "转发朋友圈",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "manual"
+    },
+    {
+      "name": "早鸟",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "auto"
+    },
+    {
+      "name": "五一报名优惠",
+      "requires_history_student": false,
+      "exclusive_with": [],
+      "mode": "auto"
+    }
+  ],
+  "quote_validity": {
+    "strategy": "follow_early_bird_stage_or_fixed",
+    "params": {
+      "fixed_until": "2026-12-31T23:59:59",
+      "fallback_minutes": 30,
+      "early_bird_stage_ends": [
+        "2026-05-15T23:59:59",
+        "2026-06-15T23:59:59"
+      ]
+    }
+  },
+  "ui_hints": {
+    "notes": [
+      "早鸟优惠会按系统时间自动生效",
+      "五一报名优惠会根据历史缴费记录自动计算"
+    ],
+    "discount_labels": {
+      "老带新": "老带新",
+      "转发朋友圈": "转发朋友圈"
+    }
+  }
+}
