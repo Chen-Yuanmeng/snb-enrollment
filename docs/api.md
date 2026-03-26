@@ -57,8 +57,16 @@
 - 参数：keyword（必填）
 - 返回：学生列表
 
-### GET /students-history/search
-- 参数：name（必填）, grade（可选）
+### GET /students-history/search/renewal
+- 说明：老生续报搜索
+- 参数：name（必填）, grade（必填）
+- 匹配规则：name 精确匹配；grade 按等价年级集合精确匹配（例如“新高一暑/五一中考/道法押题/2029届”互认）
+- 返回：老生候选列表（id, name, grade, phone_suffix）
+
+### GET /students-history/search/referral
+- 说明：老带新搜索
+- 参数：name（必填）
+- 匹配规则：仅按姓名模糊匹配，不按年级过滤
 - 返回：老生候选列表（id, name, grade, phone_suffix）
 
 ### GET /students-history

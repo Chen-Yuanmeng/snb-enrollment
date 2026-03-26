@@ -308,7 +308,7 @@ function selectedDiscounts() {
 
 function refreshHistoryArea() {
   const active = selectedDiscounts();
-  const needHistory = active.includes("老带新") || active.includes("老生续报");
+  const needHistory = active.includes("老带新");
   historyWrap.classList.toggle("hidden", !needHistory);
 }
 
@@ -360,9 +360,86 @@ function buildModeDetails(classSubjects, classMode) {
   };
 }
 
-function buildDiscountPayload(conf) {
+function isPhoneSuffixMatch(phone, phoneSuffix) {
+  const left = String(phone || "").trim();
+  const right = String(phoneSuffix || "").trim();
+  if (!left || !right) {
+    return false;
+  }
+
+  const shorter = left.length <= right.length ? left : right;
+  const longer = left.length <= right.length ? right : left;
+  return longer.endsWith(shorter);
+}
+
+function pickRenewalHistoryStudentIdManually(rows, studentName, grade) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("未找到匹配老生，无法使用老生续报");
+  }
+
+  const optionsText = rows
+    .map(
+      (row, idx) =>
+        `${idx + 1}. #${row.id} ${row.name} / ${row.grade || grade || "未知年级"} / 尾号:${row.phone_suffix || "-"}`
+    )
+    .join("\n");
+
+  const answer = window.prompt(
+    [`
+请选择老生续报对应记录：
+学生：${studentName}
+0. 无匹配（该学生按新生处理）
+${optionsText}
+请输入序号（0-${rows.length}）
+`.trim()].join("\n")
+  );
+
+  if (answer === null) {
+    throw new Error("已取消老生续报手动选择");
+  }
+
+  const picked = Number(answer.trim());
+  if (!Number.isInteger(picked) || picked < 0 || picked > rows.length) {
+    throw new Error("手动选择无效，请重新报价并输入正确序号");
+  }
+
+  if (picked === 0) {
+    throw new Error("已选择无匹配：该学生按新生处理，请取消老生续报后重新报价");
+  }
+
+  const historyStudentId = Number(rows[picked - 1]?.id || 0);
+  if (historyStudentId <= 0) {
+    throw new Error("手动选择结果无效");
+  }
+  return historyStudentId;
+}
+
+async function resolveRenewalHistoryStudentId(studentName, studentPhone, grade) {
+  const query = new URLSearchParams({ name: studentName, grade });
+  const result = await fetchJson(`${API_BASE}/students-history/search/renewal?${query.toString()}`);
+  const rows = result.data || [];
+  if (rows.length === 0) {
+    throw new Error("未找到匹配老生，无法使用老生续报");
+  }
+
+  const autoMatched = rows.filter((row) => isPhoneSuffixMatch(studentPhone, row.phone_suffix));
+  if (autoMatched.length === 1) {
+    const historyStudentId = Number(autoMatched[0]?.id || 0);
+    if (historyStudentId <= 0) {
+      throw new Error("老生续报自动匹配结果无效");
+    }
+    return historyStudentId;
+  }
+
+  return pickRenewalHistoryStudentIdManually(rows, studentName, grade);
+}
+
+async function buildDiscountPayload(conf, studentName, studentPhone) {
   const picked = selectedDiscounts();
-  const historyStudentId = Number(historyStudentSelect.value || 0);
+  const referralHistoryStudentId = Number(historyStudentSelect.value || 0);
+  const renewalHistoryStudentId = picked.includes("老生续报")
+    ? await resolveRenewalHistoryStudentId(studentName, studentPhone, conf.grade)
+    : 0;
   const discountItems = [];
 
   if (picked.includes("老带新") && picked.includes("老生续报")) {
@@ -371,14 +448,17 @@ function buildDiscountPayload(conf) {
 
   picked.forEach((name) => {
     const item = { name, amount: 0 };
-    if ((name === "老带新" || name === "老生续报") && historyStudentId > 0) {
-      item.history_student_id = historyStudentId;
+    if (name === "老带新" && referralHistoryStudentId > 0) {
+      item.history_student_id = referralHistoryStudentId;
+    }
+    if (name === "老生续报" && renewalHistoryStudentId > 0) {
+      item.history_student_id = renewalHistoryStudentId;
     }
     discountItems.push(item);
   });
 
-  if ((picked.includes("老带新") || picked.includes("老生续报")) && historyStudentId <= 0) {
-    throw new Error("已选择老带新/老生续报，请先搜索并选择老生");
+  if (picked.includes("老带新") && referralHistoryStudentId <= 0) {
+    throw new Error("已选择老带新，请先搜索并选择老生");
   }
 
   if (hasDiscount(conf, "优秀生")) {
@@ -400,7 +480,7 @@ function buildDiscountPayload(conf) {
   return discountItems;
 }
 
-function buildPayload() {
+async function buildPayload() {
   const conf = currentGrade();
   const name = document.querySelector("#studentName").value.trim();
   const phone = document.querySelector("#studentPhone").value.trim();
@@ -429,7 +509,7 @@ function buildPayload() {
     grade: conf.grade,
     class_subjects: classSubjects,
     class_mode: classMode,
-    discounts: buildDiscountPayload(conf),
+    discounts: await buildDiscountPayload(conf, name, phone),
     mode_details: buildModeDetails(classSubjects, classMode),
   };
 }
@@ -476,18 +556,17 @@ async function searchHistory() {
   }
 
   try {
-    const grade = currentGrade().grade;
-    const query = new URLSearchParams({ name: keyword, grade });
-    const result = await fetchJson(`${API_BASE}/students-history/search?${query.toString()}`);
+    const query = new URLSearchParams({ name: keyword });
+    const result = await fetchJson(`${API_BASE}/students-history/search/referral?${query.toString()}`);
     const rows = result.data || [];
     historyStudentSelect.innerHTML = `<option value=''>未选择</option>${rows
       .map((item) => `<option value='${item.id}'>${item.name} / ${item.grade || "未知"} / 尾号:${item.phone_suffix || "-"}</option>`)
       .join("")}`;
     if (rows.length === 0) {
-      alert("未找到匹配老生");
+      alert("未找到匹配老带新老生");
     }
   } catch (error) {
-    alert(`老生搜索失败: ${error.message}`);
+    alert(`老带新老生搜索失败: ${error.message}`);
   }
 }
 
@@ -496,7 +575,7 @@ quoteForm.addEventListener("submit", async (event) => {
   if (!mustOperatorAndSource()) return;
 
   try {
-    const payload = buildPayload();
+    const payload = await buildPayload();
 
     const quoteResultData = await fetchJson(`${API_BASE}/quotes/calculate`, {
       method: "POST",

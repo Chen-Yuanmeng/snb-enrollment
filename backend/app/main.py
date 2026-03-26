@@ -135,6 +135,21 @@ def _archive_student_grade(enrollment_grade: str) -> str:
     return enrollment_grade
 
 
+def _history_grade_candidates(input_grade: str) -> set[str]:
+    trimmed = (input_grade or "").strip()
+    if not trimmed:
+        return set()
+
+    canonical = _archive_student_grade(trimmed)
+    aliases: dict[str, set[str]] = {
+        "2029届": {"2029届", "道法押题", "五一中考", "新高一暑"},
+        "2028届": {"2028届", "新高二暑"},
+        "2027届": {"2027届", "新高三暑"},
+        "初中/小学": {"初中/小学", "初中/小学暑期"},
+    }
+    return aliases.get(canonical, {trimmed})
+
+
 def _get_or_create_student(db: Session, req: EnrollmentCreateRequest | QuoteCalculateRequest) -> Student:
     stmt = select(Student).where(Student.phone == req.student_info.phone)
     student = db.scalar(stmt)
@@ -240,16 +255,55 @@ def search_students(keyword: str = Query(...), db: Session = Depends(get_db)) ->
     return ApiResponse(data=data)
 
 
-@app.get(f"{config.api_prefix}/students-history/search", response_model=ApiResponse)
-def search_students_history(
+@app.get(f"{config.api_prefix}/students-history/search/renewal", response_model=ApiResponse)
+def search_students_history_for_renewal(
     name: str = Query(...),
-    grade: str | None = None,
+    grade: str = Query(...),
     db: Session = Depends(get_db),
 ) -> ApiResponse:
-    stmt = select(StudentHistory).where(StudentHistory.name.ilike(f"%{name}%"))
-    if grade:
-        stmt = stmt.where(StudentHistory.grade == grade)
-    stmt = stmt.order_by(desc(StudentHistory.id)).limit(30)
+    trimmed_name = name.strip()
+    trimmed_grade = grade.strip()
+    if not trimmed_name or not trimmed_grade:
+        raise_biz_error(40001, "老生姓名和年级不能为空")
+    grade_candidates = _history_grade_candidates(trimmed_grade)
+
+    stmt = (
+        select(StudentHistory)
+        .where(
+            StudentHistory.name == trimmed_name,
+            StudentHistory.grade.in_(grade_candidates),
+        )
+        .order_by(desc(StudentHistory.id))
+        .limit(30)
+    )
+    rows = db.scalars(stmt).all()
+    data = [
+        {
+            "id": row.id,
+            "name": row.name,
+            "grade": row.grade,
+            "phone_suffix": row.phone_suffix,
+        }
+        for row in rows
+    ]
+    return ApiResponse(data=data)
+
+
+@app.get(f"{config.api_prefix}/students-history/search/referral", response_model=ApiResponse)
+def search_students_history_for_referral(
+    name: str = Query(...),
+    db: Session = Depends(get_db),
+) -> ApiResponse:
+    trimmed_name = name.strip()
+    if not trimmed_name:
+        raise_biz_error(40001, "老生姓名不能为空")
+
+    stmt = (
+        select(StudentHistory)
+        .where(StudentHistory.name.ilike(f"%{trimmed_name}%"))
+        .order_by(desc(StudentHistory.id))
+        .limit(30)
+    )
     rows = db.scalars(stmt).all()
     data = [
         {
@@ -282,7 +336,8 @@ def list_students_history(
                 )
             )
     if grade:
-        stmt = stmt.where(StudentHistory.grade == grade)
+        candidates = _history_grade_candidates(grade)
+        stmt = stmt.where(StudentHistory.grade.in_(candidates))
 
     rows = db.scalars(stmt.order_by(desc(StudentHistory.id)).limit(limit)).all()
     data = [StudentHistoryOut.model_validate(row).model_dump() for row in rows]

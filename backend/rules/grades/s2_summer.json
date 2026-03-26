@@ -180,7 +180,7 @@
     },
     {
       "name": "老生续报",
-      "requires_history_student": true,
+      "requires_history_student": false,
       "exclusive_with": [
         "老带新"
       ],
