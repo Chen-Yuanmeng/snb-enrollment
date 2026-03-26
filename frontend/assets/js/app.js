@@ -1,0 +1,500 @@
+let API_BASE = `${window.location.origin}/api/v1`;
+
+function apiCandidates() {
+  const candidates = [`${window.location.origin}/api/v1`];
+  if (!window.location.origin.includes(":5555")) {
+    candidates.push(`${window.location.protocol}//${window.location.hostname}:5555/api/v1`);
+    candidates.push("http://127.0.0.1:5555/api/v1");
+    candidates.push("http://localhost:5555/api/v1");
+  }
+  if (!window.location.origin.includes(":3030")) {
+    candidates.push(`${window.location.protocol}//${window.location.hostname}:3030/api/v1`);
+    candidates.push("http://127.0.0.1:3030/api/v1");
+    candidates.push("http://localhost:3030/api/v1");
+  }
+  return [...new Set(candidates)];
+}
+
+async function resolveApiBase() {
+  for (const base of apiCandidates()) {
+    try {
+      const response = await fetch(`${base}/operators`);
+      if (!response.ok) {
+        continue;
+      }
+      const data = await response.json();
+      if (data && Array.isArray(data.data)) {
+        API_BASE = base;
+        return;
+      }
+    } catch (_) {
+      // try next candidate
+    }
+  }
+  throw new Error("无法连接后端API，请确认3030服务可访问");
+}
+
+let GRADE_LIST = [];
+
+const DISCOUNT_LABELS = {
+  三人成团: "三人成团（每项减100）",
+  老带新: "老带新",
+  转发朋友圈: "转发朋友圈",
+  老生续报: "老生续报",
+  现金优惠: "现金优惠",
+};
+
+const operatorSelect = document.querySelector("#operator");
+const sourceSelect = document.querySelector("#source");
+const gradeSelector = document.querySelector("#gradeSelector");
+const gradeTitle = document.querySelector("#gradeTitle");
+const quoteForm = document.querySelector("#quoteForm");
+const quoteResult = document.querySelector("#quoteResult");
+const classSubjectWrap = document.querySelector("#classSubjectWrap");
+const classModeWrap = document.querySelector("#classModeWrap");
+const mixModeWrap = document.querySelector("#mixModeWrap");
+const discountWrap = document.querySelector("#discountWrap");
+const discountNote = document.querySelector("#discountNote");
+const excellentWrap = document.querySelector("#excellentWrap");
+const historyWrap = document.querySelector("#historyWrap");
+const historyKeyword = document.querySelector("#historyKeyword");
+const historyStudentSelect = document.querySelector("#historyStudentSelect");
+const searchHistoryBtn = document.querySelector("#searchHistory");
+
+let activeGradeId = "";
+
+function currentGrade() {
+  return GRADE_LIST.find((x) => x.id === activeGradeId);
+}
+
+function shortGradeName(name) {
+  if (!name) return "";
+  if (name.length <= 8) return name;
+  return `${name.slice(0, 6)}...`;
+}
+
+function normalizeDiscounts(discounts) {
+  const list = Array.isArray(discounts) ? discounts : [];
+  const hasExcellent = list.some((name) => String(name).startsWith("优秀生"));
+  const nonExcellent = list.filter((name) => !String(name).startsWith("优秀生"));
+  return hasExcellent ? [...nonExcellent, "优秀生"] : nonExcellent;
+}
+
+function getDiscountLabel(conf, name) {
+  const labels = conf?.discountLabels || {};
+  return labels[name] || DISCOUNT_LABELS[name] || name;
+}
+
+async function loadRules() {
+  const result = await fetchJson(`${API_BASE}/rules/meta`);
+  const gradeOptions = result.data?.grade_options || [];
+  GRADE_LIST = gradeOptions.map((item, idx) => {
+    const grade = item.grade;
+    const hints = item.ui_hints || {};
+    return {
+      id: `grade${idx + 1}`,
+      grade,
+      short: shortGradeName(grade),
+      classModes: item.class_modes || [],
+      classSubjectGroups: item.class_subject_groups || [],
+      discounts: normalizeDiscounts(item.discounts || []),
+      discountLabels: hints.discount_labels || {},
+      notes: hints.notes || [],
+      selectionMode: item.selection_mode || "multiple",
+      maxSelect: item.max_select,
+    };
+  });
+
+  if (GRADE_LIST.length === 0) {
+    throw new Error("规则元数据为空");
+  }
+  activeGradeId = GRADE_LIST[0].id;
+}
+
+function mustOperatorAndSource() {
+  if (!operatorSelect.value) {
+    alert("请先选择操作员");
+    return false;
+  }
+  if (!sourceSelect.value) {
+    alert("请先选择来源");
+    return false;
+  }
+  return true;
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  if (!response.ok) {
+    const detail =
+      typeof data.detail === "object" && data.detail?.message
+        ? data.detail.message
+        : data.detail;
+    throw new Error(detail || data.message || "请求失败");
+  }
+  if (data.code && data.code !== 0) {
+    throw new Error(data.message || "请求失败");
+  }
+  return data;
+}
+
+function gridClassByLength(size) {
+  if (size >= 3) return "grid-3";
+  if (size === 2) return "grid-2";
+  return "grid-1";
+}
+
+function renderChoiceRow(inputHtml, text) {
+  return `<label class="choice-item">${inputHtml}<span>${text}</span></label>`;
+}
+
+function renderGradeTabs() {
+  gradeSelector.innerHTML = GRADE_LIST.map(
+    (item) =>
+      `<button type="button" class="grade-tab ${item.id === activeGradeId ? "active" : ""}" data-grade-id="${item.id}">${item.grade}</button>`
+  ).join("");
+
+  gradeSelector.querySelectorAll(".grade-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeGradeId = button.getAttribute("data-grade-id");
+      renderGradeTabs();
+      renderActiveGradeForm();
+    });
+  });
+}
+
+function renderClassSubjectGroups(conf) {
+  const isSingleSelect = conf.selectionMode === "single";
+  classSubjectWrap.innerHTML = conf.classSubjectGroups
+    .map((group, groupIdx) => {
+      const choices = group
+        .map((item) => {
+          const subjectName = typeof item === "string" ? item : item?.name;
+          if (!subjectName) {
+            return "";
+          }
+          const inputType = isSingleSelect ? "radio" : "checkbox";
+          const input = `<input type="${inputType}" name="classSubject" value="${subjectName}" />`;
+          return renderChoiceRow(input, subjectName);
+        })
+        .join("");
+      const separator = groupIdx < conf.classSubjectGroups.length - 1 ? "<div class='choice-group-separator'></div>" : "";
+      return `<div class="choice-group-row"><div class="choice-grid ${gridClassByLength(group.length)}">${choices}</div></div>${separator}`;
+    })
+    .join("");
+}
+
+function renderActiveGradeForm() {
+  const conf = currentGrade();
+
+  gradeTitle.textContent = `报价录入 - ${conf.grade}`;
+
+  renderClassSubjectGroups(conf);
+
+  classModeWrap.classList.remove("grid-1", "grid-2", "grid-3");
+  classModeWrap.classList.add(gridClassByLength(conf.classModes.length));
+  classModeWrap.innerHTML = conf.classModes
+    .map((mode, idx) => {
+      const checked = idx === 0 ? "checked" : "";
+      return renderChoiceRow(`<input type="radio" name="classMode" value="${mode}" ${checked} />`, mode);
+    })
+    .join("");
+
+  discountWrap.classList.remove("grid-1", "grid-2", "grid-3");
+  discountWrap.classList.add(gridClassByLength(Math.min(conf.discounts.length || 1, 3)));
+  discountWrap.innerHTML = conf.discounts
+    .filter((name) => name !== "优秀生")
+    .map((name) => {
+      const text = getDiscountLabel(conf, name);
+      return renderChoiceRow(`<input type="checkbox" name="discount" value="${name}" />`, text);
+    })
+    .join("");
+
+  if (conf.discounts.includes("优秀生")) {
+    excellentWrap.classList.remove("hidden");
+    excellentWrap.innerHTML = [
+      "<p class='hint'>优秀生（四档）</p>",
+      renderChoiceRow("<input type='radio' name='excellent' value='优秀生第一档' />", "第一档 1000"),
+      renderChoiceRow("<input type='radio' name='excellent' value='优秀生第二档' />", "第二档 800"),
+      renderChoiceRow("<input type='radio' name='excellent' value='优秀生第三档' />", "第三档 600"),
+      renderChoiceRow("<input type='radio' name='excellent' value='优秀生第四档' />", "第四档（手动填写）"),
+      "<input id='excellentManualAmount' type='number' min='0' max='600' step='1' placeholder='手动优惠金额（不超过600）' />",
+    ].join("");
+  } else {
+    excellentWrap.classList.add("hidden");
+    excellentWrap.innerHTML = "";
+  }
+
+  const tips = (conf.notes || []).concat(conf.autoNotes || []);
+  discountNote.innerHTML = tips.length ? `<div>${tips.join(" ")}</div>` : "";
+
+  refreshHistoryArea();
+  refreshMixedModeRows();
+
+  classSubjectWrap.querySelectorAll("input[name='classSubject']").forEach((item) => {
+    item.addEventListener("change", refreshMixedModeRows);
+  });
+  classModeWrap.querySelectorAll("input[name='classMode']").forEach((item) => {
+    item.addEventListener("change", refreshMixedModeRows);
+  });
+  discountWrap.querySelectorAll("input[name='discount']").forEach((item) => {
+    item.addEventListener("change", refreshHistoryArea);
+  });
+}
+
+function selectedClassMode() {
+  return classModeWrap.querySelector("input[name='classMode']:checked")?.value || "线下";
+}
+
+function selectedClassSubjects() {
+  return [...classSubjectWrap.querySelectorAll("input[name='classSubject']:checked")].map((x) => x.value);
+}
+
+function selectedDiscounts() {
+  return [...discountWrap.querySelectorAll("input[name='discount']:checked")].map((x) => x.value);
+}
+
+function refreshHistoryArea() {
+  const active = selectedDiscounts();
+  const needHistory = active.includes("老带新") || active.includes("老生续报");
+  historyWrap.classList.toggle("hidden", !needHistory);
+}
+
+function refreshMixedModeRows() {
+  const conf = currentGrade();
+  const mode = selectedClassMode();
+  const classSubjects = selectedClassSubjects();
+
+  if (!conf.classModes.includes("混合") || mode !== "混合") {
+    mixModeWrap.classList.add("hidden");
+    mixModeWrap.innerHTML = "";
+    return;
+  }
+
+  mixModeWrap.classList.remove("hidden");
+  if (classSubjects.length === 0) {
+    mixModeWrap.innerHTML = "<p class='hint'>请先选择至少一项班型与科目，再分配线上/线下。</p>";
+    return;
+  }
+
+  mixModeWrap.innerHTML = classSubjects
+    .map(
+      (item) =>
+        `<div class='mix-row'><span>${item}</span><select data-mix-item='${item}'><option value='线下'>线下</option><option value='线上'>线上</option></select></div>`
+    )
+    .join("");
+}
+
+function buildModeDetails(classSubjects, classMode) {
+  if (classMode !== "混合") {
+    return null;
+  }
+  const offline = [];
+  const online = [];
+  mixModeWrap.querySelectorAll("select[data-mix-item]").forEach((select) => {
+    const item = select.getAttribute("data-mix-item");
+    if (!classSubjects.includes(item)) {
+      return;
+    }
+    if (select.value === "线上") {
+      online.push(item);
+    } else {
+      offline.push(item);
+    }
+  });
+  return {
+    offline_subjects: offline,
+    online_subjects: online,
+  };
+}
+
+function buildDiscountPayload(conf) {
+  const picked = selectedDiscounts();
+  const historyStudentId = Number(historyStudentSelect.value || 0);
+  const discountItems = [];
+
+  if (picked.includes("老带新") && picked.includes("老生续报")) {
+    throw new Error("老带新与老生续报不能同时选择");
+  }
+
+  picked.forEach((name) => {
+    const item = { name, amount: 0 };
+    if ((name === "老带新" || name === "老生续报") && historyStudentId > 0) {
+      item.history_student_id = historyStudentId;
+    }
+    discountItems.push(item);
+  });
+
+  if ((picked.includes("老带新") || picked.includes("老生续报")) && historyStudentId <= 0) {
+    throw new Error("已选择老带新/老生续报，请先搜索并选择老生");
+  }
+
+  if (conf.discounts.includes("优秀生")) {
+    const excellent = quoteForm.querySelector("input[name='excellent']:checked")?.value;
+    if (excellent) {
+      const item = { name: excellent, amount: 0 };
+      if (excellent === "优秀生第四档") {
+        const manualInput = document.querySelector("#excellentManualAmount");
+        const manualAmount = Number(manualInput?.value || 0);
+        if (Number.isNaN(manualAmount) || manualAmount < 0 || manualAmount > 600) {
+          throw new Error("优秀生第四档金额需在0到600之间");
+        }
+        item.amount = manualAmount;
+      }
+      discountItems.push(item);
+    }
+  }
+
+  return discountItems;
+}
+
+function buildPayload() {
+  const conf = currentGrade();
+  const name = document.querySelector("#studentName").value.trim();
+  const phone = document.querySelector("#studentPhone").value.trim();
+
+  if (!name || !phone) {
+    throw new Error("姓名和手机号不能为空");
+  }
+
+  const classSubjects = selectedClassSubjects();
+  const classMode = selectedClassMode();
+
+  if (classSubjects.length === 0) {
+    throw new Error("请至少选择一项班型与科目");
+  }
+  if (conf.selectionMode === "single" && classSubjects.length !== 1) {
+    throw new Error(`${conf.grade}班型与科目仅支持单选`);
+  }
+  if (typeof conf.maxSelect === "number" && conf.maxSelect > 0 && classSubjects.length > conf.maxSelect) {
+    throw new Error(`当前年级最多可选${conf.maxSelect}项`);
+  }
+
+  return {
+    operator_name: operatorSelect.value,
+    source: sourceSelect.value,
+    student_info: { name, phone },
+    grade: conf.grade,
+    class_subjects: classSubjects,
+    class_mode: classMode,
+    discounts: buildDiscountPayload(conf),
+    mode_details: buildModeDetails(classSubjects, classMode),
+  };
+}
+
+function renderQuoteText(payload, quoteData) {
+  const lines = [
+    `${payload.student_info.name} / ${payload.student_info.phone}`,
+    `${payload.grade}`,
+    `班型与科目: ${payload.class_subjects.join("、")}`,
+    `上课方式: ${payload.class_mode}`,
+    `来源: ${payload.source}`,
+    `原价: ${quoteData.base_price}`,
+    `优惠: ${quoteData.discount_total}`,
+    `报价: ${quoteData.final_price}`,
+    `算式: ${quoteData.pricing_formula}`,
+    `有效期: ${quoteData.quote_valid_until}`,
+  ];
+
+  if (quoteData.non_price_benefits && quoteData.non_price_benefits.length > 0) {
+    lines.push("提示:");
+    quoteData.non_price_benefits.forEach((item) => lines.push(`- ${item}`));
+  }
+  return lines.join("\n");
+}
+
+async function copyText(text) {
+  if (!navigator.clipboard) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (_) {
+    // ignore clipboard errors
+  }
+}
+
+async function searchHistory() {
+  if (!mustOperatorAndSource()) return;
+
+  const keyword = historyKeyword.value.trim();
+  if (!keyword) {
+    alert("请输入老生姓名关键词");
+    return;
+  }
+
+  try {
+    const grade = currentGrade().grade;
+    const query = new URLSearchParams({ name: keyword, grade });
+    const result = await fetchJson(`${API_BASE}/students-history/search?${query.toString()}`);
+    const rows = result.data || [];
+    historyStudentSelect.innerHTML = `<option value=''>未选择</option>${rows
+      .map((item) => `<option value='${item.id}'>${item.name} / ${item.grade || "未知"} / 尾号:${item.phone_suffix || "-"}</option>`)
+      .join("")}`;
+    if (rows.length === 0) {
+      alert("未找到匹配老生");
+    }
+  } catch (error) {
+    alert(`老生搜索失败: ${error.message}`);
+  }
+}
+
+quoteForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!mustOperatorAndSource()) return;
+
+  try {
+    const payload = buildPayload();
+
+    const quoteResultData = await fetchJson(`${API_BASE}/quotes/calculate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const text = renderQuoteText(payload, quoteResultData.data);
+    await copyText(text);
+
+    try {
+      const saveResult = await fetchJson(`${API_BASE}/enrollments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      quoteResult.textContent = `${text}\n\n已自动保存为已报价单，报名ID: ${saveResult.data.enrollment_id}`;
+    } catch (saveError) {
+      quoteResult.textContent = `${text}\n\n报价已复制，但自动保存失败: ${saveError.message}`;
+    }
+  } catch (error) {
+    quoteResult.textContent = `报价失败: ${error.message}`;
+  }
+});
+
+searchHistoryBtn.addEventListener("click", searchHistory);
+
+async function loadOperators() {
+  const result = await fetchJson(`${API_BASE}/operators`);
+  operatorSelect.innerHTML = [`<option value=''>请选择</option>`]
+    .concat((result.data || []).map((item) => `<option value='${item.name}'>${item.name}</option>`))
+    .join("");
+}
+
+async function loadSources() {
+  const result = await fetchJson(`${API_BASE}/sources`);
+  sourceSelect.innerHTML = [`<option value=''>请选择</option>`]
+    .concat((result.data || []).map((item) => `<option value='${item.name}'>${item.name}</option>`))
+    .join("");
+}
+
+(async function boot() {
+  try {
+    await resolveApiBase();
+    await Promise.all([loadOperators(), loadSources(), loadRules()]);
+    renderGradeTabs();
+    renderActiveGradeForm();
+    refreshHistoryArea();
+  } catch (error) {
+    quoteResult.textContent = `页面初始化失败: ${error.message}`;
+  }
+})();

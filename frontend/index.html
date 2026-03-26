@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>山那边内部报名系统</title>
+    <link rel="stylesheet" href="./assets/css/styles.css?v=20260326c" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-main">
+        <h1>山那边内部报名系统</h1>
+        <nav class="topbar-links">
+          <a href="./pages/enrollments.html" target="_blank" rel="noopener noreferrer">已生成报价管理页面</a>
+          <a href="./pages/refunds.html" target="_blank" rel="noopener noreferrer">退费页面</a>
+          <a href="./pages/old-students.html" target="_blank" rel="noopener noreferrer">老生管理页面</a>
+        </nav>
+      </div>
+      <div class="operator-box">
+        <label for="operator">操作员</label>
+        <select id="operator">
+          <option value="">加载中...</option>
+        </select>
+        <label for="source">来源</label>
+        <select id="source">
+          <option value="">加载中...</option>
+        </select>
+      </div>
+    </header>
+
+    <main class="layout compact-layout">
+      <section class="card compact-card">
+        <div id="gradeSelector" class="grade-selector"></div>
+      </section>
+
+      <section class="card compact-card">
+        <h2 id="gradeTitle">报价录入</h2>
+        <form id="quoteForm">
+          <div class="field-grid two-col">
+            <label>
+              学生姓名
+              <input id="studentName" name="name" type="text" placeholder="请输入学生姓名" required />
+            </label>
+            <label>
+              手机号
+              <input id="studentPhone" name="phone" type="text" placeholder="请输入手机号" required />
+            </label>
+          </div>
+
+          <div class="block compact-block">
+            <h3>班型与科目</h3>
+            <div id="classSubjectWrap"></div>
+          </div>
+
+          <div class="block compact-block">
+            <h3>上课方式</h3>
+            <div id="classModeWrap" class="choice-grid"></div>
+            <div id="mixModeWrap" class="mix-mode hidden"></div>
+          </div>
+
+          <div class="block compact-block">
+            <h3>优惠活动</h3>
+            <div id="discountWrap" class="choice-grid"></div>
+            <div id="excellentWrap" class="excellent-wrap hidden"></div>
+            <div id="historyWrap" class="history-wrap hidden">
+              <p class="hint">老带新/老生续报需要先搜索并选择老生</p>
+              <div class="field-grid">
+                <input id="historyKeyword" type="text" placeholder="输入老生姓名关键词" />
+                <button id="searchHistory" type="button" class="secondary">搜索老生</button>
+              </div>
+              <label>
+                老生候选
+                <select id="historyStudentSelect">
+                  <option value="">未选择</option>
+                </select>
+              </label>
+            </div>
+            <div id="discountNote" class="discount-note"></div>
+          </div>
+
+          <div class="actions full-width-action">
+            <button type="submit">生成报价并复制</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card compact-card">
+        <h2>报价结果</h2>
+        <pre id="quoteResult" class="result">请先填写信息并生成报价</pre>
+      </section>
+    </main>
+
+    <script src="./assets/js/app.js?v=20260326c"></script>
+  </body>
+</html>

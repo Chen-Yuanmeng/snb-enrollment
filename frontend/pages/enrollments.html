@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>已生成报价管理</title>
+    <link rel="stylesheet" href="../assets/css/styles.css?v=20260326c" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-main">
+        <h1>已生成报价管理</h1>
+        <nav class="topbar-links">
+          <a href="../index.html" target="_blank" rel="noopener noreferrer">返回报名页面</a>
+          <a href="./refunds.html" target="_blank" rel="noopener noreferrer">退费页面</a>
+          <a href="./old-students.html" target="_blank" rel="noopener noreferrer">老生管理页面</a>
+        </nav>
+      </div>
+      <div class="operator-box">
+        <label for="operator">操作员</label>
+        <select id="operator">
+          <option value="">加载中...</option>
+        </select>
+        <label for="source">来源</label>
+        <select id="source">
+          <option value="">加载中...</option>
+        </select>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <h2>筛选条件</h2>
+        <div class="field-grid two-col">
+          <label>
+            年级
+            <select id="gradeFilter">
+              <option value="">全部年级</option>
+            </select>
+          </label>
+          <label>
+            状态
+            <select id="statusFilter">
+              <option value="">全部</option>
+              <option value="quoted">已报价</option>
+              <option value="paid">已缴费</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="refreshBtn" type="button">刷新列表</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>报名记录</h2>
+        <div id="enrollmentList">加载中...</div>
+      </section>
+    </main>
+
+    <script src="../assets/js/enrollments.js?v=20260326c"></script>
+  </body>
+</html>
