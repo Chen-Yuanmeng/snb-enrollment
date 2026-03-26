@@ -123,6 +123,18 @@ def _ensure_source(name: str) -> None:
         raise_biz_error(40007, "来源未选择或无效")
 
 
+def _archive_student_grade(enrollment_grade: str) -> str:
+    if enrollment_grade in {"道法押题", "五一中考", "新高一暑"}:
+        return "2029届"
+    if enrollment_grade == "新高二暑":
+        return "2028届"
+    if enrollment_grade == "新高三暑":
+        return "2027届"
+    if enrollment_grade == "初中/小学暑期":
+        return "初中/小学"
+    return enrollment_grade
+
+
 def _get_or_create_student(db: Session, req: EnrollmentCreateRequest | QuoteCalculateRequest) -> Student:
     stmt = select(Student).where(Student.phone == req.student_info.phone)
     student = db.scalar(stmt)
@@ -134,7 +146,7 @@ def _get_or_create_student(db: Session, req: EnrollmentCreateRequest | QuoteCalc
         phone=req.student_info.phone,
         gender=req.student_info.gender,
         school=req.student_info.school,
-        grade=req.grade,
+        grade=_archive_student_grade(req.grade),
         note=req.student_info.note,
     )
     db.add(student)
@@ -143,7 +155,7 @@ def _get_or_create_student(db: Session, req: EnrollmentCreateRequest | QuoteCalc
 
 
 def _inject_auto_discounts(db: Session, payload: QuoteCalculateRequest) -> QuoteCalculateRequest:
-    if payload.grade != "新高一暑期":
+    if payload.grade != "新高一暑":
         return payload
 
     if any(item.name == "五一报名优惠" for item in payload.discounts):
@@ -171,7 +183,7 @@ def _inject_auto_discounts(db: Session, payload: QuoteCalculateRequest) -> Quote
     if subject_count <= 0:
         return payload
 
-    extra = DiscountItem(name="五一报名优惠", amount=float(subject_count * 100))
+    extra = DiscountItem(name="五一报名优惠", amount=float(subject_count))
     return payload.model_copy(update={"discounts": [*payload.discounts, extra]})
 
 

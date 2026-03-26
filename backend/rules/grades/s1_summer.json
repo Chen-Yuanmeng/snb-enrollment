@@ -119,10 +119,16 @@
       {
         "name": "五一报名优惠",
         "enabled": true,
-        "strategy": "from_input_multiple_of",
+        "strategy": "case_input",
         "params": {
-          "multiple_of": 100,
-          "min_value": 0
+          "cases": {
+            "0": 0,
+            "1": 50,
+            "2": 100,
+            "3": 150,
+            "4": 200,
+            "5": 300
+          }
         }
       }
     ],

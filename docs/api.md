@@ -43,6 +43,7 @@
   - timezone
   - grades
   - grade_options（含每年级 class_modes + class_subject_groups + discounts + selection_mode + max_select + ui_hints）
+  - discounts 为对象数组，核心字段：name、mode（manual/auto）
   - status
   - sources
 

@@ -370,13 +370,15 @@ def _discount_amount_from_cfg(name: str, cfg: dict, raw_amount: float, now: date
             raise ValueError(f"{name}金额需在{int(min_value)}到{int(max_value)}之间")
         return raw_amount
 
-    if strategy == "from_input_multiple_of":
-        multiple_of = int(params.get("multiple_of", 100))
-        min_value = float(params.get("min_value", 0))
-        if raw_amount < min_value or (multiple_of > 0 and raw_amount % multiple_of != 0):
-            if name == "五一报名优惠":
-                raise ValueError("五一报名优惠金额需为非负且为100的倍数")
-            raise ValueError(f"{name}金额需为非负且为{multiple_of}的倍数")
+    if strategy == "case_input":
+        cases = params.get("cases", {})
+        if isinstance(cases, dict):
+            # Convert keys to integers and find the appropriate case
+            int_cases = {int(k): v for k, v in cases.items()}
+            if raw_amount in int_cases:
+                return float(int_cases[int(raw_amount)])
+        if name == "五一报名优惠":
+            raise ValueError("五一报名优惠金额不在可选范围内")
         return raw_amount
 
     if strategy in {"time_staged", "time_staged_per_subject"}:

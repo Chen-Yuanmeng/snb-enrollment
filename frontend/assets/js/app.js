@@ -73,16 +73,46 @@ function shortGradeName(name) {
   return `${name.slice(0, 6)}...`;
 }
 
+function normalizeDiscountItem(item) {
+  if (typeof item === "string") {
+    const name = item.trim();
+    return name ? { name, mode: "manual" } : null;
+  }
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const name = String(item.name || "").trim();
+  if (!name) {
+    return null;
+  }
+  const mode = item.mode === "auto" ? "auto" : "manual";
+  return {
+    name,
+    mode,
+    requiresHistoryStudent: Boolean(item.requires_history_student),
+    exclusiveWith: Array.isArray(item.exclusive_with) ? item.exclusive_with : [],
+  };
+}
+
 function normalizeDiscounts(discounts) {
   const list = Array.isArray(discounts) ? discounts : [];
-  const hasExcellent = list.some((name) => String(name).startsWith("优秀生"));
-  const nonExcellent = list.filter((name) => !String(name).startsWith("优秀生"));
-  return hasExcellent ? [...nonExcellent, "优秀生"] : nonExcellent;
+  const normalized = list.map(normalizeDiscountItem).filter(Boolean);
+  const hasExcellent = normalized.some((item) => item.name.startsWith("优秀生"));
+  const nonExcellent = normalized.filter((item) => !item.name.startsWith("优秀生"));
+  return hasExcellent ? [...nonExcellent, { name: "优秀生", mode: "manual" }] : nonExcellent;
 }
 
 function getDiscountLabel(conf, name) {
   const labels = conf?.discountLabels || {};
   return labels[name] || DISCOUNT_LABELS[name] || name;
+}
+
+function hasDiscount(conf, name) {
+  return (conf.discounts || []).some((item) => item.name === name);
+}
+
+function evaluateAutoDiscount(_conf, _discountName) {
+  return false;
 }
 
 async function loadRules() {
@@ -202,16 +232,37 @@ function renderActiveGradeForm() {
     .join("");
 
   discountWrap.classList.remove("grid-1", "grid-2", "grid-3");
-  discountWrap.classList.add(gridClassByLength(Math.min(conf.discounts.length || 1, 3)));
+  _length = conf.discounts.filter((item) => item.name !== "优秀生").length;
+  switch (_length) {
+    case 3:
+    case 5:
+      discountWrap.classList.add("grid-3");
+      break;
+    case 2:
+    case 4:
+      discountWrap.classList.add("grid-2");
+      break;
+    case 1:
+    default:
+      discountWrap.classList.add("grid-1");
+  }
+
   discountWrap.innerHTML = conf.discounts
-    .filter((name) => name !== "优秀生")
-    .map((name) => {
-      const text = getDiscountLabel(conf, name);
-      return renderChoiceRow(`<input type="checkbox" name="discount" value="${name}" />`, text);
+    .filter((item) => item.name !== "优秀生")
+    .map((item) => {
+      const text = getDiscountLabel(conf, item.name);
+      const isAuto = item.mode === "auto";
+      const checked = isAuto && evaluateAutoDiscount(conf, item.name) ? "checked" : "";
+      const disabled = isAuto ? "disabled" : "";
+      const row = renderChoiceRow(
+        `<input type="checkbox" name="discount" value="${item.name}" data-discount-mode="${item.mode}" ${disabled} ${checked} />`,
+        text
+      );
+      return isAuto ? row.replace("choice-item", "choice-item disabled") : row;
     })
     .join("");
 
-  if (conf.discounts.includes("优秀生")) {
+  if (hasDiscount(conf, "优秀生")) {
     excellentWrap.classList.remove("hidden");
     excellentWrap.innerHTML = [
       "<p class='hint'>优秀生（四档）</p>",
@@ -330,7 +381,7 @@ function buildDiscountPayload(conf) {
     throw new Error("已选择老带新/老生续报，请先搜索并选择老生");
   }
 
-  if (conf.discounts.includes("优秀生")) {
+  if (hasDiscount(conf, "优秀生")) {
     const excellent = quoteForm.querySelector("input[name='excellent']:checked")?.value;
     if (excellent) {
       const item = { name: excellent, amount: 0 };

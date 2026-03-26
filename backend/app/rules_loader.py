@@ -105,6 +105,17 @@ def get_rules_meta_payload(sources: list[str], status: dict[str, str]) -> dict[s
     groups = get_grade_class_subject_groups()
     modes = get_grade_class_modes()
     index = get_rules_index()
+
+    def _normalize_discount_meta(discount: dict[str, Any]) -> dict[str, Any]:
+        raw_exclusive = discount.get("exclusive_with", [])
+        exclusive_with = [str(item) for item in raw_exclusive if str(item).strip()] if isinstance(raw_exclusive, list) else []
+        return {
+            "name": str(discount.get("name", "")).strip(),
+            "mode": str(discount.get("mode", "manual")).strip() or "manual",
+            "requires_history_student": bool(discount.get("requires_history_student", False)),
+            "exclusive_with": exclusive_with,
+        }
+
     return {
         "version": index.get("version", "unknown"),
         "timezone": index.get("timezone", "Asia/Shanghai"),
@@ -115,7 +126,7 @@ def get_rules_meta_payload(sources: list[str], status: dict[str, str]) -> dict[s
                 "class_modes": modes.get(grade, []),
                 "class_subject_groups": groups.get(grade, []),
                 "discounts": [
-                    d.get("name")
+                    _normalize_discount_meta(d)
                     for d in (get_grade_rule(grade) or {}).get("discounts", [])
                     if isinstance(d, dict) and d.get("enabled", True) and d.get("name")
                 ],
