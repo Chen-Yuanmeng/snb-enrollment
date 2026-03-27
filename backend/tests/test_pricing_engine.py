@@ -9,7 +9,7 @@ def _base_req(**kwargs):
         "operator_name": "张老师",
         "source": "电咨",
         "student_info": StudentInfoInput(name="张三", phone="13800000000"),
-        "grade": "新高二暑期",
+        "grade": "新高二暑",
         "class_subjects": ["英才数学", "英才物理"],
         "class_mode": "线下",
         "mode_details": None,
@@ -56,7 +56,7 @@ def test_early_bird_window_under_30m():
 
 def test_auto_early_bird_applied_for_g1_without_discount_input():
     req = _base_req(
-        grade="新高一暑期",
+        grade="新高一暑",
         class_mode="线下",
         class_subjects=["高新领军1"],
         discounts=[],
@@ -69,9 +69,9 @@ def test_auto_early_bird_applied_for_g1_without_discount_input():
 
 def test_g1_class_subject_must_be_single_select():
     req = _base_req(
-        grade="新高一暑期",
+        grade="新高一暑",
         class_mode="线下",
-        class_subjects=["高新领军1", "高新卓越"],
+        class_subjects=["高新领军1", "高新卓越1"],
         discounts=[],
     )
     try:
@@ -83,7 +83,7 @@ def test_g1_class_subject_must_be_single_select():
 
 def test_laodaixin_requires_history_student_id():
     req = _base_req(
-        grade="新高二暑期",
+        grade="新高二暑",
         discounts=[DiscountItem(name="老带新", amount=0)],
     )
     try:
@@ -95,7 +95,7 @@ def test_laodaixin_requires_history_student_id():
 
 def test_g3_removed_video_course():
     req = _base_req(
-        grade="新高三暑期",
+        grade="新高三暑",
         class_subjects=["新一试(视频课)"],
         class_mode="线下",
     )

@@ -60,8 +60,18 @@ const historyWrap = document.querySelector("#historyWrap");
 const historyKeyword = document.querySelector("#historyKeyword");
 const historyStudentSelect = document.querySelector("#historyStudentSelect");
 const searchHistoryBtn = document.querySelector("#searchHistory");
+const studentNameInput = document.querySelector("#studentName");
+const studentPhoneInput = document.querySelector("#studentPhone");
 
 let activeGradeId = "";
+const autoDiscountCheckedNames = new Set();
+const renewalDecisionCache = new Map();
+const gradeRuleCache = new Map();
+let autoDiscountRequestSeq = 0;
+let autoRenewalHistoryStudentId = 0;
+let autoRenewalIdentityKey = "";
+let autoWuyiCaseInput = 0;
+let autoWuyiIdentityKey = "";
 
 function currentGrade() {
   return GRADE_LIST.find((x) => x.id === activeGradeId);
@@ -111,8 +121,263 @@ function hasDiscount(conf, name) {
   return (conf.discounts || []).some((item) => item.name === name);
 }
 
-function evaluateAutoDiscount(_conf, _discountName) {
-  return false;
+function evaluateAutoDiscount(_conf, discountName) {
+  return autoDiscountCheckedNames.has(discountName);
+}
+
+function getIdentityKey(grade, name, phone) {
+  return `${grade}||${String(name || "").trim()}||${String(phone || "").trim()}`;
+}
+
+function getAutoDiscountInput(discountName) {
+  return [...discountWrap.querySelectorAll("input[name='discount']")].find(
+    (input) => input.getAttribute("data-discount-mode") === "auto" && input.value === discountName
+  );
+}
+
+function clearAutoDiscountSelectionState() {
+  autoDiscountCheckedNames.clear();
+  autoRenewalHistoryStudentId = 0;
+  autoRenewalIdentityKey = "";
+  autoWuyiCaseInput = 0;
+  autoWuyiIdentityKey = "";
+  discountWrap.querySelectorAll("input[name='discount'][data-discount-mode='auto']").forEach((input) => {
+    input.checked = false;
+  });
+  refreshHistoryArea();
+}
+
+function setAutoDiscountChecked(discountName, checked) {
+  if (checked) {
+    autoDiscountCheckedNames.add(discountName);
+  } else {
+    autoDiscountCheckedNames.delete(discountName);
+  }
+  const input = getAutoDiscountInput(discountName);
+  if (input) {
+    input.checked = checked;
+  }
+}
+
+function renderDiscountNotes(conf, extraMessage = "") {
+  const tips = (conf?.notes || []).concat(conf?.autoNotes || []);
+  if (extraMessage) {
+    discountNote.innerHTML = `<div>${extraMessage}</div>`;
+    return;
+  }
+  discountNote.innerHTML = tips.length ? `<div>${tips.join(" ")}</div>` : "";
+}
+
+function resetIdentityOnGradeSwitch() {
+  autoDiscountRequestSeq += 1;
+  if (studentNameInput) {
+    studentNameInput.value = "";
+  }
+  if (studentPhoneInput) {
+    studentPhoneInput.value = "";
+  }
+  historyKeyword.value = "";
+  historyStudentSelect.innerHTML = "<option value=''>未选择</option>";
+  renewalDecisionCache.clear();
+  clearAutoDiscountSelectionState();
+}
+
+async function loadGradeRule(grade) {
+  if (gradeRuleCache.has(grade)) {
+    return gradeRuleCache.get(grade);
+  }
+  const result = await fetchJson(`${API_BASE}/rules/grade/${encodeURIComponent(grade)}`);
+  const rule = result.data || {};
+  gradeRuleCache.set(grade, rule);
+  return rule;
+}
+
+function isPhoneExactMatch(left, right) {
+  return String(left || "").trim() === String(right || "").trim();
+}
+
+function chooseRenewalHistoryStudentIdForAuto(rows, studentName, grade) {
+  const optionsText = rows
+    .map(
+      (row, idx) =>
+        `${idx + 1}. #${row.id} ${row.name} / ${row.grade || grade || "未知年级"} / 尾号:${row.phone_suffix || "-"}`
+    )
+    .join("\n");
+
+  const answer = window.prompt(
+    [`
+请选择老生续报对应记录（自动优惠判定）：
+学生：${studentName}
+0. 无匹配（按新生处理，不勾选老生续报）
+${optionsText}
+请输入序号（0-${rows.length}）
+`.trim()].join("\n")
+  );
+
+  if (answer === null) {
+    return null;
+  }
+
+  const picked = Number(answer.trim());
+  if (!Number.isInteger(picked) || picked < 0 || picked > rows.length) {
+    alert("手动选择无效，本次不勾选老生续报，请重新失焦触发检查。");
+    return null;
+  }
+
+  if (picked === 0) {
+    return 0;
+  }
+
+  return Number(rows[picked - 1]?.id || 0);
+}
+
+async function evaluateEarlyBirdEligibility(conf) {
+  if (!hasDiscount(conf, "早鸟")) {
+    return false;
+  }
+  const rule = await loadGradeRule(conf.grade);
+  const stageEnds = rule?.quote_validity?.params?.early_bird_stage_ends;
+  if (!Array.isArray(stageEnds) || stageEnds.length === 0) {
+    return false;
+  }
+  const now = new Date();
+  return stageEnds.some((value) => {
+    const end = new Date(value);
+    return !Number.isNaN(end.getTime()) && now <= end;
+  });
+}
+
+async function evaluateRenewalEligibility(conf, studentName, studentPhone) {
+  if (!hasDiscount(conf, "老生续报")) {
+    return { eligible: false, historyStudentId: 0 };
+  }
+
+  const identityKey = getIdentityKey(conf.grade, studentName, studentPhone);
+  if (renewalDecisionCache.has(identityKey)) {
+    const cached = Number(renewalDecisionCache.get(identityKey) || 0);
+    return { eligible: cached > 0, historyStudentId: cached > 0 ? cached : 0 };
+  }
+
+  const query = new URLSearchParams({ name: studentName, grade: conf.grade });
+  const result = await fetchJson(`${API_BASE}/students-history/search/renewal?${query.toString()}`);
+  const rows = result.data || [];
+  if (rows.length === 0) {
+    renewalDecisionCache.set(identityKey, 0);
+    return { eligible: false, historyStudentId: 0 };
+  }
+
+  const autoMatched = rows.filter((row) => isPhoneSuffixMatch(studentPhone, row.phone_suffix));
+  if (autoMatched.length === 1) {
+    const historyStudentId = Number(autoMatched[0]?.id || 0);
+    const normalized = historyStudentId > 0 ? historyStudentId : 0;
+    renewalDecisionCache.set(identityKey, normalized);
+    return { eligible: normalized > 0, historyStudentId: normalized };
+  }
+
+  const pickedHistoryStudentId = chooseRenewalHistoryStudentIdForAuto(rows, studentName, conf.grade);
+  if (pickedHistoryStudentId === null) {
+    renewalDecisionCache.set(identityKey, 0);
+    return { eligible: false, historyStudentId: 0 };
+  }
+  const normalized = pickedHistoryStudentId > 0 ? pickedHistoryStudentId : 0;
+  renewalDecisionCache.set(identityKey, normalized);
+  return { eligible: normalized > 0, historyStudentId: normalized };
+}
+
+async function evaluateWuyiEligibility(conf, studentName, studentPhone) {
+  if (!hasDiscount(conf, "五一报名优惠")) {
+    return { eligible: false, caseInput: 0 };
+  }
+
+  const rule = await loadGradeRule(conf.grade);
+  const cases = rule?.discount_presets?.core_common?.find((item) => item?.name === "五一报名优惠")?.params?.cases || {};
+
+  const studentResult = await fetchJson(`${API_BASE}/students/search?${new URLSearchParams({ keyword: studentPhone }).toString()}`);
+  const studentRows = studentResult.data || [];
+  const exactBoth = studentRows.find((item) => isPhoneExactMatch(item.phone, studentPhone) && item.name === studentName);
+  const exactPhone = studentRows.find((item) => isPhoneExactMatch(item.phone, studentPhone));
+  const targetStudent = exactBoth || exactPhone;
+  if (!targetStudent?.id) {
+    return { eligible: false, caseInput: 0 };
+  }
+
+  const statuses = ["paid", "refund_requested", "refunded"];
+  const enrollmentLists = await Promise.all(
+    statuses.map(async (status) => {
+      const query = new URLSearchParams({
+        student_id: String(targetStudent.id),
+        grade: "五一中考",
+        status,
+        valid: "true",
+      });
+      const enrollmentResult = await fetchJson(`${API_BASE}/enrollments?${query.toString()}`);
+      return enrollmentResult.data || [];
+    })
+  );
+
+  const merged = enrollmentLists.flat();
+  if (merged.length === 0) {
+    return { eligible: false, caseInput: 0 };
+  }
+  merged.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+  const latest = merged[0] || {};
+  const classSubjects = Array.isArray(latest.class_subjects) ? latest.class_subjects : [];
+  const subjectCount = classSubjects.length;
+  const amount = Number(cases[String(subjectCount)] ?? 0);
+  const eligible = Number.isFinite(amount) && amount > 0;
+  return { eligible, caseInput: subjectCount };
+}
+
+async function refreshAutoDiscountsByIdentity() {
+  const conf = currentGrade();
+  if (!conf) {
+    return;
+  }
+
+  const studentName = studentNameInput.value.trim();
+  const studentPhone = studentPhoneInput.value.trim();
+  const seq = ++autoDiscountRequestSeq;
+
+  if (!studentName || !studentPhone) {
+    clearAutoDiscountSelectionState();
+    renderDiscountNotes(conf);
+    return;
+  }
+
+  try {
+    const [earlyBirdEligible, renewalResult, wuyiResult] = await Promise.all([
+      evaluateEarlyBirdEligibility(conf),
+      evaluateRenewalEligibility(conf, studentName, studentPhone),
+      evaluateWuyiEligibility(conf, studentName, studentPhone),
+    ]);
+
+    if (seq !== autoDiscountRequestSeq) {
+      return;
+    }
+
+    clearAutoDiscountSelectionState();
+    if (earlyBirdEligible) {
+      setAutoDiscountChecked("早鸟", true);
+    }
+    if (renewalResult.eligible) {
+      setAutoDiscountChecked("老生续报", true);
+      autoRenewalHistoryStudentId = renewalResult.historyStudentId;
+      autoRenewalIdentityKey = getIdentityKey(conf.grade, studentName, studentPhone);
+    }
+    if (wuyiResult.eligible) {
+      setAutoDiscountChecked("五一报名优惠", true);
+      autoWuyiCaseInput = Number(wuyiResult.caseInput || 0);
+      autoWuyiIdentityKey = getIdentityKey(conf.grade, studentName, studentPhone);
+    }
+    refreshHistoryArea();
+    renderDiscountNotes(conf);
+  } catch (error) {
+    if (seq !== autoDiscountRequestSeq) {
+      return;
+    }
+    clearAutoDiscountSelectionState();
+    renderDiscountNotes(conf, `自动优惠检查失败：${error.message}`);
+  }
 }
 
 async function loadRules() {
@@ -188,6 +453,7 @@ function renderGradeTabs() {
   gradeSelector.querySelectorAll(".grade-tab").forEach((button) => {
     button.addEventListener("click", () => {
       activeGradeId = button.getAttribute("data-grade-id");
+      resetIdentityOnGradeSwitch();
       renderGradeTabs();
       renderActiveGradeForm();
     });
@@ -277,8 +543,7 @@ function renderActiveGradeForm() {
     excellentWrap.innerHTML = "";
   }
 
-  const tips = (conf.notes || []).concat(conf.autoNotes || []);
-  discountNote.innerHTML = tips.length ? `<div>${tips.join(" ")}</div>` : "";
+  renderDiscountNotes(conf);
 
   refreshHistoryArea();
   refreshMixedModeRows();
@@ -437,9 +702,19 @@ async function resolveRenewalHistoryStudentId(studentName, studentPhone, grade) 
 async function buildDiscountPayload(conf, studentName, studentPhone) {
   const picked = selectedDiscounts();
   const referralHistoryStudentId = Number(historyStudentSelect.value || 0);
-  const renewalHistoryStudentId = picked.includes("老生续报")
-    ? await resolveRenewalHistoryStudentId(studentName, studentPhone, conf.grade)
-    : 0;
+  const identityKey = getIdentityKey(conf.grade, studentName, studentPhone);
+  let renewalHistoryStudentId = 0;
+  if (picked.includes("老生续报")) {
+    if (autoRenewalIdentityKey === identityKey && autoRenewalHistoryStudentId > 0) {
+      renewalHistoryStudentId = autoRenewalHistoryStudentId;
+    } else {
+      renewalHistoryStudentId = await resolveRenewalHistoryStudentId(studentName, studentPhone, conf.grade);
+      if (renewalHistoryStudentId > 0) {
+        autoRenewalIdentityKey = identityKey;
+        autoRenewalHistoryStudentId = renewalHistoryStudentId;
+      }
+    }
+  }
   const discountItems = [];
 
   if (picked.includes("老带新") && picked.includes("老生续报")) {
@@ -453,6 +728,9 @@ async function buildDiscountPayload(conf, studentName, studentPhone) {
     }
     if (name === "老生续报" && renewalHistoryStudentId > 0) {
       item.history_student_id = renewalHistoryStudentId;
+    }
+    if (name === "五一报名优惠") {
+      item.amount = autoWuyiIdentityKey === identityKey ? Number(autoWuyiCaseInput || 0) : 0;
     }
     discountItems.push(item);
   });
@@ -602,6 +880,8 @@ quoteForm.addEventListener("submit", async (event) => {
 });
 
 searchHistoryBtn.addEventListener("click", searchHistory);
+studentNameInput.addEventListener("blur", refreshAutoDiscountsByIdentity);
+studentPhoneInput.addEventListener("blur", refreshAutoDiscountsByIdentity);
 
 async function loadOperators() {
   const result = await fetchJson(`${API_BASE}/operators`);

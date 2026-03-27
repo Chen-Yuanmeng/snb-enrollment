@@ -170,36 +170,9 @@ def _get_or_create_student(db: Session, req: EnrollmentCreateRequest | QuoteCalc
 
 
 def _inject_auto_discounts(db: Session, payload: QuoteCalculateRequest) -> QuoteCalculateRequest:
-    if payload.grade != "新高一暑":
-        return payload
-
-    if any(item.name == "五一报名优惠" for item in payload.discounts):
-        return payload
-
-    student = db.scalar(select(Student).where(Student.phone == payload.student_info.phone))
-    if not student:
-        return payload
-
-    wuyi_stmt = (
-        select(Enrollment)
-        .where(
-            Enrollment.student_id == student.id,
-            Enrollment.grade == "五一中考",
-            Enrollment.status.in_([STATUS_PAID, STATUS_REFUND_REQUESTED, STATUS_REFUNDED]),
-            Enrollment.valid.is_(True),
-        )
-        .order_by(desc(Enrollment.id))
-    )
-    latest = db.scalar(wuyi_stmt)
-    if not latest:
-        return payload
-
-    subject_count = class_subject_units(payload.grade, latest.class_subjects or [])
-    if subject_count <= 0:
-        return payload
-
-    extra = DiscountItem(name="五一报名优惠", amount=float(subject_count))
-    return payload.model_copy(update={"discounts": [*payload.discounts, extra]})
+    del db
+    # 自动优惠的最终判定放在前端，后端仅按前端提交结果进行校验与计价。
+    return payload
 
 
 @app.get("/health", response_model=ApiResponse)
