@@ -8,6 +8,9 @@ class ApiResponse(BaseModel):
     code: int = 0
     message: str = "ok"
     data: Any = None
+    total: int | None = None
+    page: int | None = None
+    page_size: int | None = None
 
 
 class DiscountItem(BaseModel):

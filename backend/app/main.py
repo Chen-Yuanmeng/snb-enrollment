@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import desc, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -294,14 +294,23 @@ def search_students_history_for_referral(
 def list_students_history(
     keyword: str | None = None,
     grade: str | None = None,
-    limit: int = Query(50, ge=1, le=200),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    limit: int | None = Query(None, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> ApiResponse:
-    stmt = select(StudentHistory)
+    normalized_page = page if isinstance(page, int) else 1
+    normalized_page_size = page_size if isinstance(page_size, int) else 20
+    normalized_limit = limit if isinstance(limit, int) else None
+
+    effective_page_size = normalized_limit if normalized_limit is not None else normalized_page_size
+    effective_page = 1 if normalized_limit is not None else normalized_page
+
+    filters = []
     if keyword:
         trimmed = keyword.strip()
         if trimmed:
-            stmt = stmt.where(
+            filters.append(
                 or_(
                     StudentHistory.name.ilike(f"%{trimmed}%"),
                     StudentHistory.grade.ilike(f"%{trimmed}%"),
@@ -310,11 +319,24 @@ def list_students_history(
             )
     if grade:
         candidates = _history_grade_candidates(grade)
-        stmt = stmt.where(StudentHistory.grade.in_(candidates))
+        filters.append(StudentHistory.grade.in_(candidates))
 
-    rows = db.scalars(stmt.order_by(desc(StudentHistory.id)).limit(limit)).all()
+    data_stmt = select(StudentHistory)
+    count_stmt = select(func.count()).select_from(StudentHistory)
+    if filters:
+        data_stmt = data_stmt.where(*filters)
+        count_stmt = count_stmt.where(*filters)
+
+    total = int(db.scalar(count_stmt) or 0)
+    rows = db.scalars(
+        data_stmt
+        .order_by(desc(StudentHistory.id))
+        .offset((effective_page - 1) * effective_page_size)
+        .limit(effective_page_size)
+    ).all()
+
     data = [StudentHistoryOut.model_validate(row).model_dump() for row in rows]
-    return ApiResponse(data=data)
+    return ApiResponse(data=data, total=total, page=effective_page, page_size=effective_page_size)
 
 
 @app.post(f"{config.api_prefix}/students-history", response_model=ApiResponse)
@@ -447,30 +469,54 @@ def list_enrollments(
     valid: bool | None = None,
     source: str | None = None,
     keyword: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    limit: int | None = Query(None, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> ApiResponse:
-    stmt = select(Enrollment, Student.name.label("student_name"), Student.phone.label("student_phone")).join(
+    normalized_page = page if isinstance(page, int) else 1
+    normalized_page_size = page_size if isinstance(page_size, int) else 20
+    normalized_limit = limit if isinstance(limit, int) else None
+
+    effective_page_size = normalized_limit if normalized_limit is not None else normalized_page_size
+    effective_page = 1 if normalized_limit is not None else normalized_page
+
+    data_stmt = select(Enrollment, Student.name.label("student_name"), Student.phone.label("student_phone")).join(
         Student, Enrollment.student_id == Student.id
     )
+    count_stmt = select(func.count()).select_from(Enrollment).join(Student, Enrollment.student_id == Student.id)
+
+    filters = []
     if status:
-        stmt = stmt.where(Enrollment.status == status)
+        filters.append(Enrollment.status == status)
     if student_id:
-        stmt = stmt.where(Enrollment.student_id == student_id)
+        filters.append(Enrollment.student_id == student_id)
     if grade:
-        stmt = stmt.where(Enrollment.grade == grade)
+        filters.append(Enrollment.grade == grade)
     if valid is not None:
-        stmt = stmt.where(Enrollment.valid.is_(valid))
+        filters.append(Enrollment.valid.is_(valid))
     if source:
-        stmt = stmt.where(Enrollment.source == source)
+        filters.append(Enrollment.source == source)
     if keyword:
         trimmed = keyword.strip()
         if trimmed:
-            filters = [Student.name.ilike(f"%{trimmed}%")]
+            keyword_filters = [Student.name.ilike(f"%{trimmed}%")]
             if trimmed.isdigit():
-                filters.append(Enrollment.id == int(trimmed))
-            stmt = stmt.where(or_(*filters))
+                keyword_filters.append(Enrollment.id == int(trimmed))
+            filters.append(or_(*keyword_filters))
 
-    rows = db.execute(stmt.order_by(desc(Enrollment.id)).limit(200)).all()
+    if filters:
+        data_stmt = data_stmt.where(*filters)
+        count_stmt = count_stmt.where(*filters)
+
+    total = int(db.scalar(count_stmt) or 0)
+
+    rows = db.execute(
+        data_stmt
+        .order_by(desc(Enrollment.id))
+        .offset((effective_page - 1) * effective_page_size)
+        .limit(effective_page_size)
+    ).all()
     data = []
     for enrollment, student_name, student_phone in rows:
         item = EnrollmentOut.model_validate(enrollment).model_dump()
@@ -480,7 +526,7 @@ def list_enrollments(
         item["base_price"] = float(enrollment.base_price)
         item["discount_total"] = float(enrollment.discount_total)
         data.append(item)
-    return ApiResponse(data=data)
+    return ApiResponse(data=data, total=total, page=effective_page, page_size=effective_page_size)
 
 
 @app.get(f"{config.api_prefix}/enrollments/{{enrollment_id}}", response_model=ApiResponse)

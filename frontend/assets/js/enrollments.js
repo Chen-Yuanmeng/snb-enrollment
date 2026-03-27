@@ -40,6 +40,14 @@ const gradeFilter = document.querySelector("#gradeFilter");
 const statusFilter = document.querySelector("#statusFilter");
 const refreshBtn = document.querySelector("#refreshBtn");
 const enrollmentList = document.querySelector("#enrollmentList");
+const enrollmentPagination = document.querySelector("#enrollmentPagination");
+
+const enrollmentState = {
+  page: 1,
+  pageSize: 20,
+  total: 0,
+  isLoading: false,
+};
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
@@ -159,18 +167,107 @@ async function payEnrollment(id) {
   }
 }
 
+function totalPages() {
+  const pages = Math.ceil((enrollmentState.total || 0) / enrollmentState.pageSize);
+  return Math.max(pages, 1);
+}
+
+function pageNumbers(current, total) {
+  const start = Math.max(1, current - 2);
+  const end = Math.min(total, current + 2);
+  const pages = [];
+  for (let p = start; p <= end; p += 1) {
+    pages.push(p);
+  }
+  return pages;
+}
+
+function renderEnrollmentPagination() {
+  if (!enrollmentPagination) return;
+
+  if (!enrollmentState.total) {
+    enrollmentPagination.innerHTML = "";
+    return;
+  }
+
+  const current = enrollmentState.page;
+  const pages = totalPages();
+  const numbers = pageNumbers(current, pages);
+
+  enrollmentPagination.innerHTML = `
+    <div class='pagination-controls'>
+      <button type='button' class='pagination-btn pagination-nav-btn' data-enrollment-page='${current - 1}' ${current <= 1 ? "disabled" : ""}>上一页</button>
+      ${numbers
+        .map(
+          (p) =>
+            `<button type='button' class='pagination-btn pagination-page-btn ${p === current ? "current" : ""}' data-enrollment-page='${p}' ${
+              p === current ? "disabled" : ""
+            }>${p}</button>`
+        )
+        .join("")}
+      <button type='button' class='pagination-btn pagination-nav-btn' data-enrollment-page='${current + 1}' ${current >= pages ? "disabled" : ""}>下一页</button>
+      <div class='pagination-jump'>
+        <label for='enrollmentJumpInput' class='pagination-jump-label'>跳转</label>
+        <input id='enrollmentJumpInput' class='pagination-jump-input' type='number' min='1' max='${pages}' value='${current}' />
+        <button type='button' class='pagination-btn pagination-jump-btn' data-enrollment-jump='1'>跳转</button>
+      </div>
+      <span class='pagination-summary'>第 ${current}/${pages} 页，共 ${enrollmentState.total} 条</span>
+    </div>
+  `;
+}
+
+function parseEnrollmentJumpPage() {
+  if (!enrollmentPagination) return null;
+  const input = enrollmentPagination.querySelector("#enrollmentJumpInput");
+  if (!(input instanceof HTMLInputElement)) return null;
+  const value = Number(input.value);
+  if (!Number.isFinite(value)) return null;
+  const pages = totalPages();
+  return Math.max(1, Math.min(Math.trunc(value), pages));
+}
+
+function parseRows(result) {
+  if (Array.isArray(result.data)) {
+    return result.data;
+  }
+  if (result.data && Array.isArray(result.data.items)) {
+    return result.data.items;
+  }
+  return [];
+}
+
+function parseTotal(result, rows) {
+  if (Number.isFinite(Number(result.total))) {
+    return Number(result.total);
+  }
+  if (result.data && Number.isFinite(Number(result.data.total))) {
+    return Number(result.data.total);
+  }
+  return rows.length;
+}
+
 async function loadEnrollments() {
+  if (enrollmentState.isLoading) return;
+
+  enrollmentState.isLoading = true;
   enrollmentList.textContent = "加载中...";
   try {
     const query = new URLSearchParams();
+    query.append("page", String(enrollmentState.page));
+    query.append("page_size", String(enrollmentState.pageSize));
     if (statusFilter.value) query.append("status", statusFilter.value);
     if (gradeFilter.value) query.append("grade", gradeFilter.value);
 
     const result = await fetchJson(`${API_BASE}/enrollments?${query.toString()}`);
-    const rows = result.data || [];
+    const rows = parseRows(result);
+    enrollmentState.total = parseTotal(result, rows);
+    if (enrollmentState.page > totalPages()) {
+      enrollmentState.page = totalPages();
+    }
 
     if (rows.length === 0) {
-      enrollmentList.innerHTML = "<p>暂无记录</p>";
+      enrollmentList.innerHTML = enrollmentState.page > 1 ? "<p>当前页暂无记录</p>" : "<p>暂无记录</p>";
+      renderEnrollmentPagination();
       return;
     }
 
@@ -199,21 +296,71 @@ async function loadEnrollments() {
         `;
       })
       .join("");
-
-    enrollmentList.querySelectorAll("button[data-pay-id]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const id = Number(button.getAttribute("data-pay-id"));
-        payEnrollment(id);
-      });
-    });
+    renderEnrollmentPagination();
   } catch (error) {
     enrollmentList.textContent = `加载失败: ${error.message}`;
+    if (enrollmentPagination) {
+      enrollmentPagination.innerHTML = "";
+    }
+  } finally {
+    enrollmentState.isLoading = false;
   }
 }
 
 refreshBtn.addEventListener("click", loadEnrollments);
-gradeFilter.addEventListener("change", loadEnrollments);
-statusFilter.addEventListener("change", loadEnrollments);
+gradeFilter.addEventListener("change", async () => {
+  enrollmentState.page = 1;
+  await loadEnrollments();
+});
+statusFilter.addEventListener("change", async () => {
+  enrollmentState.page = 1;
+  await loadEnrollments();
+});
+enrollmentList.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  const button = target.closest("button[data-pay-id]");
+  if (!button) return;
+  const id = Number(button.getAttribute("data-pay-id"));
+  if (!Number.isFinite(id)) return;
+  await payEnrollment(id);
+});
+enrollmentPagination?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+
+  const jumpButton = target.closest("button[data-enrollment-jump]");
+  if (jumpButton) {
+    const jumpPage = parseEnrollmentJumpPage();
+    if (!jumpPage || jumpPage === enrollmentState.page) return;
+    enrollmentState.page = jumpPage;
+    await loadEnrollments();
+    return;
+  }
+
+  const button = target.closest("button[data-enrollment-page]");
+  if (!button) return;
+
+  const nextPage = Number(button.getAttribute("data-enrollment-page"));
+  if (!Number.isFinite(nextPage)) return;
+  const pages = totalPages();
+  const normalized = Math.max(1, Math.min(nextPage, pages));
+  if (normalized === enrollmentState.page) return;
+  enrollmentState.page = normalized;
+  await loadEnrollments();
+});
+enrollmentPagination?.addEventListener("keydown", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (event.key !== "Enter") return;
+  if (!(target instanceof HTMLInputElement) || target.id !== "enrollmentJumpInput") return;
+
+  event.preventDefault();
+  const jumpPage = parseEnrollmentJumpPage();
+  if (!jumpPage || jumpPage === enrollmentState.page) return;
+  enrollmentState.page = jumpPage;
+  await loadEnrollments();
+});
 
 (async function boot() {
   try {

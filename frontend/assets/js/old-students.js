@@ -46,6 +46,14 @@ const newGradeInput = document.querySelector("#newGrade");
 const newPhoneSuffixInput = document.querySelector("#newPhoneSuffix");
 const newNoteInput = document.querySelector("#newNote");
 const historyList = document.querySelector("#historyList");
+const historyPagination = document.querySelector("#historyPagination");
+
+const historyState = {
+  page: 1,
+  pageSize: 20,
+  total: 0,
+  isLoading: false,
+};
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
@@ -74,7 +82,7 @@ function mustOperatorAndSource() {
 
 function renderHistoryRows(rows) {
   if (!rows || rows.length === 0) {
-    historyList.innerHTML = "<p>暂无老生记录</p>";
+    historyList.innerHTML = historyState.page > 1 ? "<p>当前页暂无老生记录</p>" : "<p>暂无老生记录</p>";
     return;
   }
 
@@ -96,12 +104,96 @@ function renderHistoryRows(rows) {
     .join("");
 }
 
+function totalPages() {
+  const pages = Math.ceil((historyState.total || 0) / historyState.pageSize);
+  return Math.max(pages, 1);
+}
+
+function pageNumbers(current, total) {
+  const start = Math.max(1, current - 2);
+  const end = Math.min(total, current + 2);
+  const pages = [];
+  for (let p = start; p <= end; p += 1) {
+    pages.push(p);
+  }
+  return pages;
+}
+
+function renderHistoryPagination() {
+  if (!historyPagination) return;
+
+  if (!historyState.total) {
+    historyPagination.innerHTML = "";
+    return;
+  }
+
+  const current = historyState.page;
+  const pages = totalPages();
+  const numbers = pageNumbers(current, pages);
+
+  historyPagination.innerHTML = `
+    <div class='pagination-controls'>
+      <button type='button' class='pagination-btn pagination-nav-btn' data-history-page='${current - 1}' ${current <= 1 ? "disabled" : ""}>上一页</button>
+      ${numbers
+        .map(
+          (p) =>
+            `<button type='button' class='pagination-btn pagination-page-btn ${p === current ? "current" : ""}' data-history-page='${p}' ${
+              p === current ? "disabled" : ""
+            }>${p}</button>`
+        )
+        .join("")}
+      <button type='button' class='pagination-btn pagination-nav-btn' data-history-page='${current + 1}' ${current >= pages ? "disabled" : ""}>下一页</button>
+      <div class='pagination-jump'>
+        <label for='historyJumpInput' class='pagination-jump-label'>跳转</label>
+        <input id='historyJumpInput' class='pagination-jump-input' type='number' min='1' max='${pages}' value='${current}' />
+        <button type='button' class='pagination-btn pagination-jump-btn' data-history-jump='1'>跳转</button>
+      </div>
+      <span class='pagination-summary'>第 ${current}/${pages} 页，共 ${historyState.total} 条</span>
+    </div>
+  `;
+}
+
+function parseHistoryJumpPage() {
+  if (!historyPagination) return null;
+  const input = historyPagination.querySelector("#historyJumpInput");
+  if (!(input instanceof HTMLInputElement)) return null;
+  const value = Number(input.value);
+  if (!Number.isFinite(value)) return null;
+  const pages = totalPages();
+  return Math.max(1, Math.min(Math.trunc(value), pages));
+}
+
+function parseRows(result) {
+  if (Array.isArray(result.data)) {
+    return result.data;
+  }
+  if (result.data && Array.isArray(result.data.items)) {
+    return result.data.items;
+  }
+  return [];
+}
+
+function parseTotal(result, rows) {
+  if (Number.isFinite(Number(result.total))) {
+    return Number(result.total);
+  }
+  if (result.data && Number.isFinite(Number(result.data.total))) {
+    return Number(result.data.total);
+  }
+  return rows.length;
+}
+
 async function searchHistory() {
+  if (historyState.isLoading) return;
+
+  historyState.isLoading = true;
   historyList.textContent = "加载中...";
   try {
     const query = new URLSearchParams();
     const keyword = searchKeywordInput.value.trim();
     const grade = searchGradeInput.value.trim();
+    query.append("page", String(historyState.page));
+    query.append("page_size", String(historyState.pageSize));
     if (keyword) {
       query.append("keyword", keyword);
     }
@@ -110,9 +202,20 @@ async function searchHistory() {
     }
 
     const result = await fetchJson(`${API_BASE}/students-history?${query.toString()}`);
-    renderHistoryRows(result.data || []);
+    const rows = parseRows(result);
+    historyState.total = parseTotal(result, rows);
+    if (historyState.page > totalPages()) {
+      historyState.page = totalPages();
+    }
+    renderHistoryRows(rows);
+    renderHistoryPagination();
   } catch (error) {
     historyList.textContent = `查询失败: ${error.message}`;
+    if (historyPagination) {
+      historyPagination.innerHTML = "";
+    }
+  } finally {
+    historyState.isLoading = false;
   }
 }
 
@@ -149,6 +252,7 @@ async function createHistory(event) {
     newPhoneSuffixInput.value = "";
     newNoteInput.value = "";
 
+    historyState.page = 1;
     await searchHistory();
     alert("老生新增成功");
   } catch (error) {
@@ -170,13 +274,53 @@ async function loadSources() {
     .join("");
 }
 
-searchBtn.addEventListener("click", searchHistory);
+searchBtn.addEventListener("click", async () => {
+  historyState.page = 1;
+  await searchHistory();
+});
 resetBtn.addEventListener("click", async () => {
   searchKeywordInput.value = "";
   searchGradeInput.value = "";
+  historyState.page = 1;
   await searchHistory();
 });
 createForm.addEventListener("submit", createHistory);
+historyPagination?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+
+  const jumpButton = target.closest("button[data-history-jump]");
+  if (jumpButton) {
+    const jumpPage = parseHistoryJumpPage();
+    if (!jumpPage || jumpPage === historyState.page) return;
+    historyState.page = jumpPage;
+    await searchHistory();
+    return;
+  }
+
+  const button = target.closest("button[data-history-page]");
+  if (!button) return;
+
+  const nextPage = Number(button.getAttribute("data-history-page"));
+  if (!Number.isFinite(nextPage)) return;
+  const pages = totalPages();
+  const normalized = Math.max(1, Math.min(nextPage, pages));
+  if (normalized === historyState.page) return;
+  historyState.page = normalized;
+  await searchHistory();
+});
+historyPagination?.addEventListener("keydown", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (event.key !== "Enter") return;
+  if (!(target instanceof HTMLInputElement) || target.id !== "historyJumpInput") return;
+
+  event.preventDefault();
+  const jumpPage = parseHistoryJumpPage();
+  if (!jumpPage || jumpPage === historyState.page) return;
+  historyState.page = jumpPage;
+  await searchHistory();
+});
 
 (async function boot() {
   try {

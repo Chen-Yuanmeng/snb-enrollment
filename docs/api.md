@@ -71,9 +71,9 @@
 
 ### GET /students-history
 - 说明：老生管理列表查询（支持关键词）
-- 参数（可选）：keyword, grade, limit（默认50，最大200）
+- 参数（可选）：keyword, grade, page（默认1）, page_size（默认20，最大200）, limit（兼容旧参数，传入后按第一页+limit返回）
 - 关键词支持匹配：name / grade / phone_suffix
-- 返回：老生记录列表（id, name, grade, phone_suffix, note, created_at）
+- 返回：`data` 为老生记录列表（id, name, grade, phone_suffix, note, created_at），并在顶层返回分页元数据：`total`, `page`, `page_size`
 
 ### POST /students-history
 - 说明：手动新增老生记录
@@ -117,9 +117,9 @@
 - 返回：enrollment_id, status
 
 ### GET /enrollments
-- 参数（可选）：status, student_id, grade, valid, source, keyword
+- 参数（可选）：status, student_id, grade, valid, source, keyword, page（默认1）, page_size（默认20，最大200）, limit（兼容旧参数，传入后按第一页+limit返回）
 - keyword 支持：学生姓名模糊匹配；纯数字时按报名ID精确匹配
-- 返回：报名列表（含 class_subjects, source, student_name, student_phone）
+- 返回：`data` 为报名列表（含 class_subjects, source, student_name, student_phone），并在顶层返回分页元数据：`total`, `page`, `page_size`
 
 ### GET /enrollments/{enrollment_id}
 - 返回：单条详情（含 class_subjects, source, 算式、快照、优惠明细）
