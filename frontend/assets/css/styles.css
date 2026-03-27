@@ -137,6 +137,10 @@ h3 {
   grid-template-columns: 1fr 1fr;
 }
 
+.three-col {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 label {
   display: flex;
   gap: 3px;
@@ -455,6 +459,10 @@ button.secondary {
 
 @media (max-width: 640px) {
   .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .three-col {
     grid-template-columns: 1fr;
   }
 

@@ -36,6 +36,7 @@ async function resolveApiBase() {
 
 const operatorSelect = document.querySelector("#operator");
 const sourceSelect = document.querySelector("#source");
+const studentNameFilter = document.querySelector("#studentNameFilter");
 const gradeFilter = document.querySelector("#gradeFilter");
 const statusFilter = document.querySelector("#statusFilter");
 const refreshBtn = document.querySelector("#refreshBtn");
@@ -257,6 +258,8 @@ async function loadEnrollments() {
     query.append("page_size", String(enrollmentState.pageSize));
     if (statusFilter.value) query.append("status", statusFilter.value);
     if (gradeFilter.value) query.append("grade", gradeFilter.value);
+    const studentName = studentNameFilter?.value.trim() || "";
+    if (studentName) query.append("keyword", studentName);
 
     const result = await fetchJson(`${API_BASE}/enrollments?${query.toString()}`);
     const rows = parseRows(result);
@@ -308,6 +311,12 @@ async function loadEnrollments() {
 }
 
 refreshBtn.addEventListener("click", loadEnrollments);
+studentNameFilter?.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  enrollmentState.page = 1;
+  await loadEnrollments();
+});
 gradeFilter.addEventListener("change", async () => {
   enrollmentState.page = 1;
   await loadEnrollments();
