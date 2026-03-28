@@ -183,6 +183,25 @@ button.secondary {
   border-top: 1px dashed var(--line);
 }
 
+.summary-box {
+  border: 1px solid #e2e2e2;
+  border-radius: 6px;
+  padding: 8px;
+  background: #fcfcfc;
+}
+
+.summary-box h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+
+.summary-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .compact-block {
   margin-top: 8px;
 }
@@ -338,6 +357,10 @@ button.secondary {
   line-height: 1.4;
 }
 
+.compact-result {
+  min-height: 56px;
+}
+
 .status-pill {
   display: inline-block;
   border-radius: 999px;
@@ -478,6 +501,19 @@ button.secondary {
 
 .hidden {
   display: none;
+}
+
+#refundForm .field-grid.two-col > label {
+  min-width: 0;
+}
+
+#searchResultSelect {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (min-width: 760px) {

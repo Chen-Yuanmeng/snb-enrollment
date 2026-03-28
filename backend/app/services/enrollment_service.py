@@ -146,6 +146,7 @@ def list_enrollments(
         item["student_name"] = student_name or ""
         item["student_phone"] = student_phone or ""
         item["discount_info"] = enrollment.discount_info or {}
+        item["pricing_snapshot"] = enrollment.pricing_snapshot or {}
         item["base_price"] = float(enrollment.base_price)
         item["discount_total"] = float(enrollment.discount_total)
         data.append(item)

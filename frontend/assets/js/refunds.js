@@ -1,5 +1,13 @@
 let API_BASE = `${window.location.origin}/api/v1`;
 
+const DISCOUNT_LABELS = {
+  三人成团: "三人成团（每项减100）",
+  老带新: "老带新",
+  转发朋友圈: "转发朋友圈",
+  老生续报: "老生续报",
+  现金优惠: "现金优惠",
+};
+
 function apiCandidates() {
   const candidates = [`${window.location.origin}/api/v1`];
   if (!window.location.origin.includes(":5555")) {
@@ -39,11 +47,6 @@ const sourceSelect = document.querySelector("#source");
 const searchKeywordInput = document.querySelector("#searchKeyword");
 const searchEnrollmentBtn = document.querySelector("#searchEnrollment");
 const searchResultSelect = document.querySelector("#searchResultSelect");
-const oldStudentNameInput = document.querySelector("#oldStudentName");
-const oldStudentPhoneInput = document.querySelector("#oldStudentPhone");
-const oldGradeInput = document.querySelector("#oldGrade");
-const oldClassSubjectsInput = document.querySelector("#oldClassSubjects");
-const oldDiscountsInput = document.querySelector("#oldDiscounts");
 const originalIdInput = document.querySelector("#originalId");
 const studentNameInput = document.querySelector("#studentName");
 const studentPhoneInput = document.querySelector("#studentPhone");
@@ -51,10 +54,13 @@ const newGradeSelect = document.querySelector("#newGrade");
 const newClassModeSelect = document.querySelector("#newClassMode");
 const newClassSubjectWrap = document.querySelector("#newClassSubjectWrap");
 const newMixModeWrap = document.querySelector("#newMixModeWrap");
-const newClassSubjectsInput = document.querySelector("#newClassSubjects");
-const newDiscountsInput = document.querySelector("#newDiscounts");
-const reviewNoteInput = document.querySelector("#reviewNote");
-const previewRefundBtn = document.querySelector("#previewRefund");
+const newDiscountWrap = document.querySelector("#newDiscountWrap");
+const excellentWrap = document.querySelector("#excellentWrap");
+const historyWrap = document.querySelector("#historyWrap");
+const historyKeywordInput = document.querySelector("#historyKeyword");
+const historyStudentSelect = document.querySelector("#historyStudentSelect");
+const searchHistoryBtn = document.querySelector("#searchHistory");
+const discountNote = document.querySelector("#discountNote");
 const submitRefundBtn = document.querySelector("#submitRefund");
 const refundResult = document.querySelector("#refundResult");
 
@@ -65,6 +71,7 @@ const STORAGE_KEYS = {
 
 let gradeRules = [];
 let currentSearchRows = [];
+let autofilledReferralHistoryStudentId = 0;
 
 function readStoredValue(key) {
   try {
@@ -106,6 +113,18 @@ async function fetchJson(url, options = {}) {
   return data;
 }
 
+async function copyText(text) {
+  if (!navigator.clipboard) {
+    return false;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 function mustOperator() {
   if (!operatorSelect.value) {
     alert("请先选择操作员");
@@ -118,49 +137,99 @@ function mustOperator() {
   return true;
 }
 
-function parseClassSubjects(raw) {
-  return raw
-    .split(/\n|,|，|;/)
-    .map((x) => x.trim())
-    .filter(Boolean);
+function normalizeDiscountItem(item) {
+  if (typeof item === "string") {
+    const name = item.trim();
+    return name ? { name, mode: "manual" } : null;
+  }
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const name = String(item.name || "").trim();
+  if (!name) {
+    return null;
+  }
+  return {
+    name,
+    mode: item.mode === "auto" ? "auto" : "manual",
+    requiresHistoryStudent: Boolean(item.requires_history_student),
+    exclusiveWith: Array.isArray(item.exclusive_with) ? item.exclusive_with : [],
+  };
 }
 
-function parseDiscounts(raw) {
-  const lines = raw
-    .split(/\n|;/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return lines.map((line) => {
-    const parts = line.split(/,|，|:|：/).map((item) => item.trim());
-    const name = parts[0] || "";
-    const amountRaw = parts[1] || "0";
-    const amount = Number(amountRaw);
-    return {
-      name,
-      amount: Number.isFinite(amount) ? amount : 0,
-    };
-  }).filter((item) => item.name);
+function normalizeDiscounts(discounts) {
+  const list = Array.isArray(discounts) ? discounts : [];
+  const normalized = list.map(normalizeDiscountItem).filter(Boolean);
+  const hasExcellent = normalized.some((item) => item.name.startsWith("优秀生"));
+  const nonExcellent = normalized.filter((item) => !item.name.startsWith("优秀生"));
+  return hasExcellent ? [...nonExcellent, { name: "优秀生", mode: "manual" }] : nonExcellent;
 }
 
-function discountInfoToLines(discountInfo) {
-  if (!discountInfo || typeof discountInfo !== "object") {
-    return "";
-  }
-  return Object.entries(discountInfo)
-    .map(([name, amount]) => `${name},${Number(amount) || 0}`)
-    .join("\n");
+function getDiscountLabel(rule, name) {
+  const labels = rule?.discountLabels || {};
+  return labels[name] || DISCOUNT_LABELS[name] || name;
 }
 
-function discountInfoToReadableText(discountInfo) {
-  if (!discountInfo || typeof discountInfo !== "object") {
-    return "-";
+function hasDiscount(rule, name) {
+  return (rule?.discounts || []).some((item) => item.name === name);
+}
+
+function selectedDiscounts() {
+  return [...newDiscountWrap.querySelectorAll("input[name='refundDiscount']:checked")].map((item) => item.value);
+}
+
+function buildDiscountItems() {
+  const picked = selectedDiscounts();
+  const discountItems = [];
+
+  if (picked.includes("老带新") && picked.includes("老生续报")) {
+    throw new Error("老带新与老生续报不能同时选择");
   }
-  const rows = Object.entries(discountInfo);
-  if (rows.length === 0) {
-    return "-";
+
+  picked.forEach((name) => {
+    const item = { name, amount: 0 };
+    if (name === "老带新") {
+      const historyStudentId = Number(historyStudentSelect.value || 0);
+      if (historyStudentId <= 0) {
+        throw new Error("已选择老带新，请先搜索并选择老生");
+      }
+      item.history_student_id = historyStudentId;
+    }
+    discountItems.push(item);
+  });
+
+  const excellent = document.querySelector("input[name='excellent']:checked")?.value;
+  if (excellent) {
+    const item = { name: excellent, amount: 0 };
+    if (excellent === "优秀生第四档") {
+      const manualInput = document.querySelector("#excellentManualAmount");
+      const manualAmount = Number(manualInput?.value || 0);
+      if (Number.isNaN(manualAmount) || manualAmount < 0 || manualAmount > 600) {
+        throw new Error("优秀生第四档金额需在0到600之间");
+      }
+      item.amount = manualAmount;
+    }
+    discountItems.push(item);
   }
-  return rows.map(([name, amount]) => `${name}: ${Number(amount) || 0}`).join("\n");
+
+  return discountItems;
+}
+
+function applyDiscountsByNames(names) {
+  const wanted = new Set((names || []).filter((name) => !String(name).startsWith("优秀生")));
+  newDiscountWrap.querySelectorAll("input[name='refundDiscount']").forEach((item) => {
+    item.checked = wanted.has(item.value);
+  });
+}
+
+function renderDiscountNotes(rule) {
+  const notes = rule?.notes || [];
+  discountNote.textContent = notes.length ? notes.join(" ") : "";
+}
+
+function refreshHistoryArea() {
+  const needHistory = selectedDiscounts().includes("老带新");
+  historyWrap.classList.toggle("hidden", !needHistory);
 }
 
 function currentRule() {
@@ -266,11 +335,54 @@ function renderClassModes(rule) {
   newClassModeSelect.innerHTML = modes.map((mode) => `<option value='${mode}'>${mode}</option>`).join("");
 }
 
+function renderDiscounts(rule) {
+  const discounts = (rule.discounts || []).filter((item) => item?.name && item.name !== "优秀生");
+  if (discounts.length === 0) {
+    newDiscountWrap.innerHTML = "<p class='hint'>当前年级暂无可选优惠活动</p>";
+  } else {
+    newDiscountWrap.classList.remove("grid-1", "grid-2", "grid-3");
+    newDiscountWrap.classList.add(gridClassByLength(discounts.length));
+    newDiscountWrap.innerHTML = discounts
+      .map((item) => {
+        const isAuto = item.mode === "auto";
+        const disabled = isAuto ? "disabled" : "";
+        const row = renderChoiceRow(
+          `<input type='checkbox' name='refundDiscount' value='${item.name}' data-discount-mode='${item.mode}' ${disabled} />`,
+          getDiscountLabel(rule, item.name)
+        );
+        return isAuto ? row.replace("choice-item", "choice-item disabled") : row;
+      })
+      .join("");
+  }
+
+  if (hasDiscount(rule, "优秀生")) {
+    excellentWrap.classList.remove("hidden");
+    excellentWrap.innerHTML = [
+      "<p class='hint'>优秀生（四档）</p>",
+      renderChoiceRow("<input type='radio' name='excellent' value='优秀生第一档' />", "第一档 1000"),
+      renderChoiceRow("<input type='radio' name='excellent' value='优秀生第二档' />", "第二档 800"),
+      renderChoiceRow("<input type='radio' name='excellent' value='优秀生第三档' />", "第三档 600"),
+      renderChoiceRow("<input type='radio' name='excellent' value='优秀生第四档' />", "第四档（手动填写）"),
+      "<input id='excellentManualAmount' type='number' min='0' max='600' step='1' placeholder='手动优惠金额（不超过600）' />",
+    ].join("");
+  } else {
+    excellentWrap.classList.add("hidden");
+    excellentWrap.innerHTML = "";
+  }
+
+  newDiscountWrap.querySelectorAll("input[name='refundDiscount']").forEach((item) => {
+    item.addEventListener("change", refreshHistoryArea);
+  });
+  renderDiscountNotes(rule);
+  refreshHistoryArea();
+}
+
 function renderGradeRule() {
   const rule = currentRule();
   if (!rule) return;
   renderClassModes(rule);
   renderClassSubjectGroups(rule);
+  renderDiscounts(rule);
   refreshMixedModeRows();
 }
 
@@ -305,20 +417,16 @@ function applyEnrollmentToForm(row) {
   }
 
   const classSubjects = Array.isArray(row.class_subjects) ? row.class_subjects : [];
+  const snapshotDiscounts = Array.isArray(row?.pricing_snapshot?.discounts) ? row.pricing_snapshot.discounts : [];
   const discountInfo = row.discount_info || {};
+  const discountNames = snapshotDiscounts.length
+    ? snapshotDiscounts.map((item) => item?.name).filter(Boolean)
+    : Object.keys(discountInfo || {});
 
   originalIdInput.value = String(row.id || "");
 
-  oldStudentNameInput.value = row.student_name || "";
-  oldStudentPhoneInput.value = row.student_phone || "";
-  oldGradeInput.value = row.grade || "";
-  oldClassSubjectsInput.value = classSubjects.join("、");
-  oldDiscountsInput.value = discountInfoToReadableText(discountInfo);
-
   studentNameInput.value = row.student_name || "";
   studentPhoneInput.value = row.student_phone || "";
-  newClassSubjectsInput.value = classSubjects.join("\n");
-  newDiscountsInput.value = discountInfoToLines(discountInfo);
 
   if (row.grade) {
     newGradeSelect.value = row.grade;
@@ -332,7 +440,66 @@ function applyEnrollmentToForm(row) {
     }
   }
   applyClassSubjectsByValues(classSubjects);
+  applyDiscountsByNames(discountNames);
+  const excellentPicked = snapshotDiscounts.find((item) => String(item?.name || "").startsWith("优秀生"));
+  if (excellentPicked) {
+    const excellentInput = document.querySelector(
+      `input[name='excellent'][value='${excellentPicked.name}']`
+    );
+    if (excellentInput) {
+      excellentInput.checked = true;
+    }
+    if (excellentPicked.name === "优秀生第四档") {
+      const manualInput = document.querySelector("#excellentManualAmount");
+      if (manualInput) {
+        manualInput.value = String(Number(excellentPicked.amount || 0));
+      }
+    }
+  }
+
+  const referralDiscount = snapshotDiscounts.find((item) => item?.name === "老带新");
+  autofilledReferralHistoryStudentId = Number(referralDiscount?.history_student_id || 0);
+  if (autofilledReferralHistoryStudentId > 0) {
+    historyStudentSelect.innerHTML = [
+      `<option value='${autofilledReferralHistoryStudentId}'>已关联老生ID: ${autofilledReferralHistoryStudentId}</option>`,
+    ].join("");
+    historyStudentSelect.value = String(autofilledReferralHistoryStudentId);
+  } else {
+    historyStudentSelect.innerHTML = "<option value=''>未选择</option>";
+  }
   refreshMixedModeRows();
+  refreshHistoryArea();
+}
+
+async function searchHistory() {
+  if (!mustOperator()) return;
+
+  const keyword = historyKeywordInput.value.trim();
+  if (!keyword) {
+    alert("请输入老生姓名关键词");
+    return;
+  }
+
+  try {
+    const query = new URLSearchParams({ name: keyword });
+    const result = await fetchJson(`${API_BASE}/students-history/search/referral?${query.toString()}`);
+    const rows = result.data || [];
+    historyStudentSelect.innerHTML = `<option value=''>未选择</option>${rows
+      .map((item) => `<option value='${item.id}'>${item.name} / ${item.grade || "未知"} / 尾号:${item.phone_suffix || "-"}</option>`)
+      .join("")}`;
+
+    if (autofilledReferralHistoryStudentId > 0) {
+      const exists = rows.some((item) => Number(item.id) === autofilledReferralHistoryStudentId);
+      if (exists) {
+        historyStudentSelect.value = String(autofilledReferralHistoryStudentId);
+      }
+    }
+    if (rows.length === 0) {
+      alert("未找到匹配老带新老生");
+    }
+  } catch (error) {
+    alert(`老带新老生搜索失败: ${error.message}`);
+  }
 }
 
 function buildPayload() {
@@ -342,10 +509,8 @@ function buildPayload() {
   const grade = newGradeSelect.value;
   const classMode = newClassModeSelect.value;
   const rule = currentRule();
-  const selected = selectedClassSubjects();
-  const fallbackTyped = parseClassSubjects(newClassSubjectsInput.value);
-  const classSubjects = selected.length > 0 ? selected : fallbackTyped;
-  const discounts = parseDiscounts(newDiscountsInput.value);
+  const classSubjects = selectedClassSubjects();
+  const discounts = buildDiscountItems();
 
   if (!originalId) {
     throw new Error("原报名ID不能为空");
@@ -354,7 +519,7 @@ function buildPayload() {
     throw new Error("学生姓名和手机号不能为空");
   }
   if (classSubjects.length === 0) {
-    throw new Error("请填写至少一个新班型与科目");
+    throw new Error("请至少选择一个班型与科目");
   }
   if (rule && (rule.selection_mode || "multiple") === "single" && classSubjects.length !== 1) {
     throw new Error(`${grade}班型与科目仅支持单选`);
@@ -362,8 +527,8 @@ function buildPayload() {
   if (rule && typeof rule.max_select === "number" && rule.max_select > 0 && classSubjects.length > rule.max_select) {
     throw new Error(`${grade}班型与科目最多可选${rule.max_select}项`);
   }
-  if (classMode === "混合" && selected.length === 0) {
-    throw new Error("混合模式请通过上方规则项勾选科目，手填不支持混合拆分");
+  if (classMode === "混合" && classSubjects.length === 0) {
+    throw new Error("混合模式下请先勾选班型与科目");
   }
 
   const modeDetails = buildModeDetails(classSubjects, classMode);
@@ -385,7 +550,7 @@ function buildPayload() {
       discounts,
       mode_details: modeDetails,
     },
-    review_note: reviewNoteInput.value.trim() || null,
+    review_note: null,
   };
 }
 
@@ -400,6 +565,29 @@ function renderSearchResults(rows) {
       )
     )
     .join("");
+}
+
+function renderAdjustmentSummary(data) {
+  const branchMap = {
+    increase: "金额增加（需补交）",
+    decrease: "金额减少（可退费）",
+    equal: "金额不变",
+  };
+  const branchText = branchMap[data.branch_type] || data.branch_type || "-";
+  return [
+    `分支类型: ${branchText}`,
+    `原金额: ${data.old_price}`,
+    `新金额: ${data.new_price}`,
+    `差额: ${data.delta_amount}`,
+    `需补交: ${data.payable_amount || 0}`,
+    `应退费: ${data.refundable_amount || 0}`,
+    `原报名ID: ${data.related_ids?.original_enrollment_id || "-"}`,
+    `新报名ID: ${data.related_ids?.recalculated_enrollment_id || "-"}`,
+    `退费单ID: ${data.related_ids?.refund_id || "-"}`,
+    "",
+    "通知文案:",
+    data.notice_text || "-",
+  ].join("\n");
 }
 
 async function searchPaidEnrollments() {
@@ -431,30 +619,6 @@ async function searchPaidEnrollments() {
   }
 }
 
-async function previewRefund() {
-  if (!mustOperator()) return;
-
-  try {
-    const payload = buildPayload();
-    const result = await fetchJson(`${API_BASE}/refunds/preview`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = result.data;
-    refundResult.textContent = [
-      `原金额: ${data.old_price}`,
-      `新金额: ${data.new_price}`,
-      `退费金额: ${data.refund_amount}`,
-      `自动拒绝: ${data.auto_rejected ? "是" : "否"}`,
-      `说明: ${data.reject_reason || "-"}`,
-    ].join("\n");
-  } catch (error) {
-    refundResult.textContent = `预览失败: ${error.message}`;
-  }
-}
-
 async function submitRefund() {
   if (!mustOperator()) return;
 
@@ -466,8 +630,12 @@ async function submitRefund() {
       body: JSON.stringify(payload),
     });
 
-    refundResult.textContent = `提交成功: 退费ID ${result.data.refund_id}，金额 ${result.data.refund_amount}`;
-    await loadPaidEnrollments();
+    const content = renderAdjustmentSummary(result.data || {});
+    refundResult.textContent = content;
+    const copied = await copyText((result.data && result.data.notice_text) || content);
+    if (!copied) {
+      refundResult.textContent = `${content}\n\n提示: 当前浏览器不支持自动复制，请手动复制通知文案。`;
+    }
   } catch (error) {
     refundResult.textContent = `提交失败: ${error.message}`;
   }
@@ -491,7 +659,20 @@ async function loadSources() {
 
 async function loadRules() {
   const result = await fetchJson(`${API_BASE}/rules/meta`);
-  gradeRules = result.data?.grade_options || [];
+  const gradeOptions = result.data?.grade_options || [];
+  gradeRules = gradeOptions.map((item) => {
+    const hints = item.ui_hints || {};
+    return {
+      grade: item.grade,
+      class_modes: item.class_modes || [],
+      class_subject_groups: item.class_subject_groups || [],
+      selection_mode: item.selection_mode || "multiple",
+      max_select: item.max_select,
+      discounts: normalizeDiscounts(item.discounts || []),
+      discountLabels: hints.discount_labels || {},
+      notes: hints.notes || [],
+    };
+  });
   const grades = gradeRules.map((item) => item.grade);
   newGradeSelect.innerHTML = grades.map((item) => `<option value='${item}'>${item}</option>`).join("");
   renderGradeRule();
@@ -508,7 +689,7 @@ searchResultSelect.addEventListener("change", () => {
 searchEnrollmentBtn.addEventListener("click", searchPaidEnrollments);
 newGradeSelect.addEventListener("change", renderGradeRule);
 newClassModeSelect.addEventListener("change", refreshMixedModeRows);
-previewRefundBtn.addEventListener("click", previewRefund);
+searchHistoryBtn.addEventListener("click", searchHistory);
 submitRefundBtn.addEventListener("click", submitRefund);
 operatorSelect.addEventListener("change", () => {
   writeStoredValue(STORAGE_KEYS.operator, operatorSelect.value);

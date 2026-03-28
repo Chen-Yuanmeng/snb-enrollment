@@ -15,7 +15,6 @@
 - 40002 操作员未选择或无效
 - 40003 重复提交
 - 40005 状态流转非法
-- 40006 退费金额小于等于0（自动拒绝）
 - 40007 来源未选择或无效
 - 40401 数据不存在
 - 50000 服务异常
@@ -134,7 +133,7 @@
 - 入参：operator_name, source, enrollment_ids[]
 - 处理：逐条校验并流转 quoted -> paid
 
-## 5. 退费
+## 5. 报名调整
 ### POST /refunds/preview
 - 入参：
   - operator_name
@@ -143,15 +142,20 @@
   - new_enrollment_payload（同试算入参结构）
 - 处理：
   - new_enrollment_payload.source 必须与顶层 source 一致
-  - 计算 old_price/new_price/refund_amount
-  - refund_amount <= 0 时标记自动拒绝
+  - 计算 old_price/new_price
+  - 根据差额返回 branch_type：
+    - increase（金额增加，需补交）
+    - decrease（金额减少，可退费）
+    - equal（金额不变）
+  - 返回通知文案 notice_text（用于前端默认复制）
 
 ### POST /refunds
 - 入参与 preview 一致，增加 review_note
 - 处理：
-  - 原单置为 refund_requested
-  - 差额 > 0 时流转为 refunded 并落退款单
-  - 差额 <= 0 返回 40006（自动拒绝）
+  - 金额增加（increase）：创建一条新报名记录（status=quoted，待确认缴费），返回补交金额
+  - 金额减少（decrease）：创建退费记录，原报名置为 refund_requested，返回退费提示
+  - 金额不变（equal）：不创建新报名或退费记录，仅生成通知文案
+  - 统一返回：branch_type、old_price、new_price、delta_amount、payable_amount、refundable_amount、related_ids、notice_text
 
 ## 6. 日志
 ### GET /logs
