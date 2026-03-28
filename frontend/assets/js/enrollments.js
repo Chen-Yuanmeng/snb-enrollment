@@ -278,17 +278,19 @@ async function loadEnrollments() {
       .map((item) => {
         const canPay = item.status === "quoted";
         const subjects = Array.isArray(item.class_subjects) ? item.class_subjects.join("、") : "-";
+        const payable = formatMoney(item.final_price);
         return `
           <div class='list-row'>
             <div>
-              <strong>#${item.id}</strong><br />
-              学生姓名: ${item.student_name || "-"}<br />
-              年级: ${item.grade || "-"}<br />
-              所报科目: ${subjects}<br />
-              报名时间: ${formatDateTime(item.created_at)}<br />
-              报价信息: ${renderQuoteInfo(item)}<br />
-              来源: ${item.source || "-"}
-              <span class='status-pill ${statusClass(item.status)}'>${statusText(item.status)}</span>
+              <div class='enrollment-title-line'>
+                <strong>#${item.id} ${item.student_name || "-"}</strong>
+                <span class='grade-pill'>${item.grade || "-"}</span>
+                <span class='amount-pill'>应缴 ${payable}</span>
+                <span class='source-pill'>${item.source || "-"}</span>
+              </div>
+              <div class='enrollment-meta'>科目: ${subjects}</div>
+              <div class='enrollment-meta'>报价时间: ${formatDateTime(item.created_at)}</div>
+              <div class='enrollment-meta'>报价信息: ${renderQuoteInfo(item)}</div>
             </div>
             ${
               canPay

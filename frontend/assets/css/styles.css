@@ -362,6 +362,39 @@ button.secondary {
   font-size: 12px;
 }
 
+.enrollment-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.source-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #244e7a;
+  background: #e8f2ff;
+}
+
+.grade-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #4a6985;
+  background: #e1ecf7;
+  font-weight: bold;
+}
+
+.enrollment-meta {
+  font-size: 11px;
+  color: #5f6978;
+  line-height: 1.45;
+}
+
 .list-row:last-child {
   border-bottom: none;
 }
