@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.main import list_enrollments
 from app.models import Enrollment, Student
@@ -6,6 +6,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _make_session():
@@ -38,7 +42,7 @@ def _seed_enrollments(db):
             non_price_benefits={"notes": []},
             pricing_formula="base-discount",
             pricing_snapshot={"version": 1},
-            quote_valid_until=datetime.utcnow(),
+            quote_valid_until=_utcnow_naive(),
             quote_fingerprint="fp-1",
             status="quoted",
             valid=True,
@@ -58,7 +62,7 @@ def _seed_enrollments(db):
             non_price_benefits={"notes": []},
             pricing_formula="base",
             pricing_snapshot={"version": 1},
-            quote_valid_until=datetime.utcnow(),
+            quote_valid_until=_utcnow_naive(),
             quote_fingerprint="fp-2",
             status="paid",
             valid=True,
@@ -78,7 +82,7 @@ def _seed_enrollments(db):
             non_price_benefits={"notes": []},
             pricing_formula="base-discount",
             pricing_snapshot={"version": 1},
-            quote_valid_until=datetime.utcnow(),
+            quote_valid_until=_utcnow_naive(),
             quote_fingerprint="fp-3",
             status="quoted",
             valid=True,

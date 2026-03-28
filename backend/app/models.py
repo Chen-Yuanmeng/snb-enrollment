@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Tex
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
+from .core.datetime_utils import utcnow_naive
 from .database import Base
 
 
@@ -17,9 +18,9 @@ class Student(Base):
     birth_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
     school: Mapped[str | None] = mapped_column(String(100), nullable=True)
     grade: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utcnow_naive, onupdate=utcnow_naive
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -31,7 +32,7 @@ class StudentHistory(Base):
     name: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     grade: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     phone_suffix: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -62,9 +63,9 @@ class Enrollment(Base):
     operator_name: Mapped[str] = mapped_column(String(50), nullable=False)
     source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utcnow_naive, onupdate=utcnow_naive
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -94,7 +95,7 @@ class Refund(Base):
 
     operator_name: Mapped[str] = mapped_column(String(50), nullable=False)
     source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -110,4 +111,4 @@ class OperationLog(Base):
     request_summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     result_status: Mapped[str] = mapped_column(String(20), nullable=False)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, index=True)

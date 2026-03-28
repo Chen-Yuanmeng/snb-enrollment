@@ -6,9 +6,9 @@ After=network.target
 Type=simple
 User=administrator
 Group=administrator
-WorkingDirectory=/home/administrator/Desktop/snb-enrollment
+WorkingDirectory=/home/administrator/Desktop/snb-enrollment/backend
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/administrator/Desktop/snb-enrollment/.venv/bin/python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 5555
+ExecStart=/home/administrator/Desktop/snb-enrollment/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 5555
 Restart=always
 RestartSec=3
 
