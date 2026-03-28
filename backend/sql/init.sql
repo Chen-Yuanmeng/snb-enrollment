@@ -99,3 +99,27 @@ CREATE INDEX IF NOT EXISTS idx_logs_operator_time ON operation_logs(operator_nam
 CREATE INDEX IF NOT EXISTS idx_logs_action_time ON operation_logs(action_type, created_at);
 CREATE INDEX IF NOT EXISTS idx_logs_target ON operation_logs(target_type, target_id);
 CREATE INDEX IF NOT EXISTS idx_logs_source_time ON operation_logs(source, created_at);
+
+CREATE TABLE IF NOT EXISTS message_tasks (
+    id BIGSERIAL PRIMARY KEY,
+    message_type VARCHAR(50) NOT NULL,
+    webhook_url VARCHAR(1000) NOT NULL,
+    text TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    idempotency_key VARCHAR(64) NOT NULL UNIQUE,
+    status VARCHAR(20) NOT NULL,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    next_retry_at TIMESTAMP NULL,
+    remote_msg_id VARCHAR(100) NULL,
+    last_error TEXT NULL,
+    error_chain JSONB NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    executed_at TIMESTAMP NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_tasks_status_next_retry
+    ON message_tasks(status, next_retry_at);
+CREATE INDEX IF NOT EXISTS idx_message_tasks_type ON message_tasks(message_type);
+CREATE INDEX IF NOT EXISTS idx_message_tasks_webhook_url ON message_tasks(webhook_url);
+CREATE INDEX IF NOT EXISTS idx_message_tasks_created_at ON message_tasks(created_at);

@@ -1,5 +1,5 @@
 [Unit]
-Description=SNB Enrollment (FastAPI + Frontend Static)
+Description=SNB Enrollment WeCom Worker
 After=network.target
 
 [Service]
@@ -9,7 +9,8 @@ Group=administrator
 WorkingDirectory=/home/administrator/Desktop/snb-enrollment/backend
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=-/etc/snb-enrollment/common.env
-ExecStart=/home/administrator/Desktop/snb-enrollment/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 5555
+EnvironmentFile=-/etc/snb-enrollment/wecom-worker.env
+ExecStart=/home/administrator/Desktop/snb-enrollment/.venv/bin/python -m app.workers.wecom_message_worker
 Restart=always
 RestartSec=3
 

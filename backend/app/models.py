@@ -112,3 +112,28 @@ class OperationLog(Base):
     result_status: Mapped[str] = mapped_column(String(20), nullable=False)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, index=True)
+
+
+class MessageTask(Base):
+    __tablename__ = "message_tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    message_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    webhook_url: Mapped[str] = mapped_column(String(1000), nullable=False, index=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+    idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    retry_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+
+    remote_msg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_chain: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow_naive, onupdate=utcnow_naive, index=True
+    )
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

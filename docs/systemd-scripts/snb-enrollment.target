@@ -1,0 +1,7 @@
+[Unit]
+Description=SNB Enrollment Full Stack (API + WeCom Worker)
+Wants=snb-enrollment.service snb-enrollment-wecom-worker.service
+After=network.target
+
+[Install]
+WantedBy=multi-user.target

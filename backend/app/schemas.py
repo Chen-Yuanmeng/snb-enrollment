@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -146,3 +146,24 @@ class StudentHistoryOut(BaseModel):
     note: str | None
     created_at: datetime
 
+
+class NotificationSendRequest(BaseModel):
+    operator_name: str = Field(min_length=1, max_length=50)
+    source: str = Field(min_length=1, max_length=50)
+    type: Literal["quotation", "payment", "adjustment", "refund"]
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class MessageTaskOut(BaseModel):
+    id: int
+    message_type: str
+    webhook_url: str
+    text: str
+    status: str
+    retry_count: int
+    next_retry_at: datetime | None
+    last_error: str | None
+    remote_msg_id: str | None
+    payload: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
