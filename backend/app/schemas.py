@@ -69,6 +69,7 @@ class QuoteResult(BaseModel):
     non_price_benefits: list[str]
     discount_info: dict[str, float]
     pricing_snapshot: dict[str, Any]
+    quote_text: str
 
 
 class EnrollmentCreateRequest(QuoteCalculateRequest):

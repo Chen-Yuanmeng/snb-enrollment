@@ -26,6 +26,8 @@ def test_g2_offline_base_price():
     assert quote.base_price == 5040 * 2
     assert quote.discount_info.get("早鸟") == 200
     assert quote.final_price == 9880
+    assert "张三 / 13800000000" in quote.quote_text
+    assert "提示:" in quote.quote_text
 
 
 def test_mutual_exclusion_discount():

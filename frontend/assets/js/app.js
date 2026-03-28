@@ -825,6 +825,10 @@ async function buildPayload() {
 }
 
 function renderQuoteText(payload, quoteData) {
+  if (quoteData?.quote_text) {
+    return quoteData.quote_text;
+  }
+
   const lines = [
     `${payload.student_info.name} / ${payload.student_info.phone}`,
     `${payload.grade}`,

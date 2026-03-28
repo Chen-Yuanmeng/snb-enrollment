@@ -104,6 +104,7 @@
   - pricing_formula
   - quote_valid_until
   - non_price_benefits
+  - quote_text（后端生成的完整报价提示文本，可直接用于复制/发送）
   - pricing_snapshot
 
 ### POST /enrollments

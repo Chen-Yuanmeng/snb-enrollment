@@ -490,6 +490,34 @@ def _calc_valid_until(req: QuoteCalculateRequest, now: datetime) -> datetime:
     return datetime.fromisoformat(str(params.get("fixed_until", NON_EARLY_BIRD_VALID_UNTIL)))
 
 
+def _format_price(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else str(value)
+
+
+def render_quote_text(req: QuoteCalculateRequest, quote: QuoteResult) -> str:
+    """
+    TODO: 按照实际需求调整文本内容和格式
+    """
+    lines = [
+        f"{req.student_info.name} / {req.student_info.phone}",
+        req.grade,
+        f"班型与科目: {'、'.join(req.class_subjects)}",
+        f"上课方式: {req.class_mode}",
+        f"来源: {req.source}",
+        f"原价: {_format_price(quote.base_price)}",
+        f"优惠: {_format_price(quote.discount_total)}",
+        f"报价: {_format_price(quote.final_price)}",
+        f"算式: {quote.pricing_formula}",
+        f"有效期: {quote.quote_valid_until.isoformat()}",
+    ]
+
+    if quote.non_price_benefits:
+        lines.append("提示:")
+        lines.extend(f"- {item}" for item in quote.non_price_benefits)
+
+    return "\n".join(lines)
+
+
 def build_quote(req: QuoteCalculateRequest, now: datetime | None = None) -> QuoteResult:
     current = now or datetime.now()
     _validate_request(req)
@@ -512,7 +540,7 @@ def build_quote(req: QuoteCalculateRequest, now: datetime | None = None) -> Quot
         "generated_at": current.isoformat(),
     }
 
-    return QuoteResult(
+    quote = QuoteResult(
         base_price=base_price,
         discount_total=discount_total,
         final_price=final_price,
@@ -521,7 +549,10 @@ def build_quote(req: QuoteCalculateRequest, now: datetime | None = None) -> Quot
         non_price_benefits=non_price_benefits,
         discount_info=discount_info,
         pricing_snapshot=snapshot,
+        quote_text="",
     )
+    quote.quote_text = render_quote_text(req, quote)
+    return quote
 
 
 def build_fingerprint(student_id: int, req: QuoteCalculateRequest, final_price: float) -> str:
