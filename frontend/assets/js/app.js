@@ -63,6 +63,11 @@ const searchHistoryBtn = document.querySelector("#searchHistory");
 const studentNameInput = document.querySelector("#studentName");
 const studentPhoneInput = document.querySelector("#studentPhone");
 
+const STORAGE_KEYS = {
+  operator: "snb.selectedOperator",
+  source: "snb.selectedSource",
+};
+
 let activeGradeId = "";
 const autoDiscountCheckedNames = new Set();
 const renewalDecisionCache = new Map();
@@ -72,6 +77,33 @@ let autoRenewalHistoryStudentId = 0;
 let autoRenewalIdentityKey = "";
 let autoWuyiCaseInput = 0;
 let autoWuyiIdentityKey = "";
+
+function readStoredValue(key) {
+  try {
+    return window.localStorage.getItem(key) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function writeStoredValue(key, value) {
+  try {
+    window.localStorage.setItem(key, value || "");
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function restoreSelectValue(select, key) {
+  const value = readStoredValue(key);
+  if (!value) {
+    return;
+  }
+  const optionExists = [...select.options].some((item) => item.value === value);
+  if (optionExists) {
+    select.value = value;
+  }
+}
 
 function currentGrade() {
   return GRADE_LIST.find((x) => x.id === activeGradeId);
@@ -888,6 +920,7 @@ async function loadOperators() {
   operatorSelect.innerHTML = [`<option value=''>请选择</option>`]
     .concat((result.data || []).map((item) => `<option value='${item.name}'>${item.name}</option>`))
     .join("");
+  restoreSelectValue(operatorSelect, STORAGE_KEYS.operator);
 }
 
 async function loadSources() {
@@ -895,7 +928,16 @@ async function loadSources() {
   sourceSelect.innerHTML = [`<option value=''>请选择</option>`]
     .concat((result.data || []).map((item) => `<option value='${item.name}'>${item.name}</option>`))
     .join("");
+  restoreSelectValue(sourceSelect, STORAGE_KEYS.source);
 }
+
+operatorSelect.addEventListener("change", () => {
+  writeStoredValue(STORAGE_KEYS.operator, operatorSelect.value);
+});
+
+sourceSelect.addEventListener("change", () => {
+  writeStoredValue(STORAGE_KEYS.source, sourceSelect.value);
+});
 
 (async function boot() {
   try {

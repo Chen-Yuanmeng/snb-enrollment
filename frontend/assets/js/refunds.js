@@ -58,8 +58,40 @@ const previewRefundBtn = document.querySelector("#previewRefund");
 const submitRefundBtn = document.querySelector("#submitRefund");
 const refundResult = document.querySelector("#refundResult");
 
+const STORAGE_KEYS = {
+  operator: "snb.selectedOperator",
+  source: "snb.selectedSource",
+};
+
 let gradeRules = [];
 let currentSearchRows = [];
+
+function readStoredValue(key) {
+  try {
+    return window.localStorage.getItem(key) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function writeStoredValue(key, value) {
+  try {
+    window.localStorage.setItem(key, value || "");
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function restoreSelectValue(select, key) {
+  const value = readStoredValue(key);
+  if (!value) {
+    return;
+  }
+  const optionExists = [...select.options].some((item) => item.value === value);
+  if (optionExists) {
+    select.value = value;
+  }
+}
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
@@ -446,6 +478,7 @@ async function loadOperators() {
   operatorSelect.innerHTML = [`<option value=''>请选择</option>`]
     .concat((result.data || []).map((item) => `<option value='${item.name}'>${item.name}</option>`))
     .join("");
+  restoreSelectValue(operatorSelect, STORAGE_KEYS.operator);
 }
 
 async function loadSources() {
@@ -453,6 +486,7 @@ async function loadSources() {
   sourceSelect.innerHTML = [`<option value=''>请选择</option>`]
     .concat((result.data || []).map((item) => `<option value='${item.name}'>${item.name}</option>`))
     .join("");
+  restoreSelectValue(sourceSelect, STORAGE_KEYS.source);
 }
 
 async function loadRules() {
@@ -476,6 +510,12 @@ newGradeSelect.addEventListener("change", renderGradeRule);
 newClassModeSelect.addEventListener("change", refreshMixedModeRows);
 previewRefundBtn.addEventListener("click", previewRefund);
 submitRefundBtn.addEventListener("click", submitRefund);
+operatorSelect.addEventListener("change", () => {
+  writeStoredValue(STORAGE_KEYS.operator, operatorSelect.value);
+});
+sourceSelect.addEventListener("change", () => {
+  writeStoredValue(STORAGE_KEYS.source, sourceSelect.value);
+});
 
 (async function boot() {
   try {

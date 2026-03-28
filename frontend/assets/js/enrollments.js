@@ -43,12 +43,44 @@ const refreshBtn = document.querySelector("#refreshBtn");
 const enrollmentList = document.querySelector("#enrollmentList");
 const enrollmentPagination = document.querySelector("#enrollmentPagination");
 
+const STORAGE_KEYS = {
+  operator: "snb.selectedOperator",
+  source: "snb.selectedSource",
+};
+
 const enrollmentState = {
   page: 1,
   pageSize: 20,
   total: 0,
   isLoading: false,
 };
+
+function readStoredValue(key) {
+  try {
+    return window.localStorage.getItem(key) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function writeStoredValue(key, value) {
+  try {
+    window.localStorage.setItem(key, value || "");
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function restoreSelectValue(select, key) {
+  const value = readStoredValue(key);
+  if (!value) {
+    return;
+  }
+  const optionExists = [...select.options].some((item) => item.value === value);
+  if (optionExists) {
+    select.value = value;
+  }
+}
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
@@ -132,6 +164,7 @@ async function loadOperators() {
   operatorSelect.innerHTML = [`<option value=''>请选择</option>`]
     .concat((result.data || []).map((item) => `<option value='${item.name}'>${item.name}</option>`))
     .join("");
+  restoreSelectValue(operatorSelect, STORAGE_KEYS.operator);
 }
 
 async function loadSources() {
@@ -139,6 +172,7 @@ async function loadSources() {
   sourceSelect.innerHTML = [`<option value=''>请选择</option>`]
     .concat((result.data || []).map((item) => `<option value='${item.name}'>${item.name}</option>`))
     .join("");
+  restoreSelectValue(sourceSelect, STORAGE_KEYS.source);
 }
 
 async function loadRules() {
@@ -313,6 +347,12 @@ async function loadEnrollments() {
 }
 
 refreshBtn.addEventListener("click", loadEnrollments);
+operatorSelect.addEventListener("change", () => {
+  writeStoredValue(STORAGE_KEYS.operator, operatorSelect.value);
+});
+sourceSelect.addEventListener("change", () => {
+  writeStoredValue(STORAGE_KEYS.source, sourceSelect.value);
+});
 studentNameFilter?.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();
