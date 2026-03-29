@@ -1,11 +1,15 @@
 import hashlib
 import json
 from datetime import datetime, timedelta
+from sqlalchemy import select
+from typing import Any
 
+from .database import SessionLocal
+from .models import Student, StudentHistory
 from .class_subject_meta import GRADE_CLASS_SUBJECT_OPTIONS
 from .constants import NON_EARLY_BIRD_VALID_UNTIL
 from .rules_loader import get_grade_rule
-from .schemas import QuoteCalculateRequest, QuoteResult
+from .schemas import QuoteCalculateRequest, QuoteResult, DiscountItem
 
 
 EARLY_BIRD_STAGE_1 = datetime.fromisoformat("2026-05-15T23:59:59")
@@ -494,25 +498,109 @@ def _format_price(value: float) -> str:
     return str(int(value)) if float(value).is_integer() else str(value)
 
 
+def _get_name_and_info_from_student_id(student_id: int) -> str:
+    default_name = "未知老生"
+    default_grade = "年级未知"
+
+    with SessionLocal() as db:
+        history_row = db.scalar(select(StudentHistory).where(StudentHistory.id == student_id))
+        if history_row is not None:
+            student_name = history_row.name or default_name
+            student_grade = history_row.grade or default_grade
+            return f"{student_name} (ID: {student_id}, {student_grade})"
+
+    return f"{default_name} (ID: {student_id}, {default_grade})"
+
+
+def _render_discount_info_text(discounts: list[DiscountItem]) -> str:
+    if not discounts:
+        return ""
+    lines = []
+    
+    for idx, discount in enumerate(discounts):
+        name = discount.name
+        amount = discount.amount
+        if name == "老带新":
+            lines.append(f"{idx + 1}. {name}优惠: {_format_price(amount)} (关联老生: {_get_name_and_info_from_student_id(int(amount))})")
+            continue
+        else:
+            lines.append(f"{idx + 1}. {name}: {_format_price(amount)}")
+
+    return "\n".join(lines)
+
+
+def _render_mixed_mode_details_text(mode_details: dict[str, Any] | None) -> str:
+    if not mode_details:
+        return ""
+    lines = []
+    online_subjects = mode_details.get("online_subjects", [])
+    offline_subjects = mode_details.get("offline_subjects", [])
+    if online_subjects:
+        lines.append(f"线上科目: {'、'.join(online_subjects)}")
+    if offline_subjects:
+        lines.append(f"线下科目: {'、'.join(offline_subjects)}")
+    return "\n".join(lines)
+
+
 def render_quote_text(req: QuoteCalculateRequest, quote: QuoteResult) -> str:
     """
-    TODO: 按照实际需求调整文本内容和格式
+    生成给家长的报价文本，包含报价详情和优惠信息等。
+
+    req: QuoteCalculateRequest - 报价请求数据，包含学生信息、年级、科目、上课方式、优惠等。
+    quote: QuoteResult - 计算得到的报价结果，包含价格、优惠信息、有效期等。
     """
     lines = [
-        f"{req.student_info.name} / {req.student_info.phone}",
+        f"学生姓名: {req.student_info.name} 家长电话: {req.student_info.phone}",
+        "--------------------------------",
         req.grade,
-        f"班型与科目: {'、'.join(req.class_subjects)}",
-        f"上课方式: {req.class_mode}",
-        f"来源: {req.source}",
+        f"{'、'.join(req.class_subjects)}",
+        f"上课方式: {req.class_mode if req.class_mode != '混合' else ('混合 (' + _render_mixed_mode_details_text(req.mode_details) + ')')}",
+        "--------------------------------",
+        f"优惠:\n{_render_discount_info_text(req.discounts)}\n" \
+        "--------------------------------" if req.discounts else "",
         f"原价: {_format_price(quote.base_price)}",
-        f"优惠: {_format_price(quote.discount_total)}",
-        f"报价: {_format_price(quote.final_price)}",
         f"算式: {quote.pricing_formula}",
-        f"有效期: {quote.quote_valid_until.isoformat()}",
+        "--------------------------------",
+        f"报价: {_format_price(quote.final_price)}",
+        f"有效期: {quote.quote_valid_until.strftime('%Y/%m/%d %H:%M:%S 中国标准时间')}",
     ]
 
     if quote.non_price_benefits:
         lines.append("提示:")
+        lines.extend(f"- {item}" for item in quote.non_price_benefits)
+
+    return "\n".join(lines)
+
+
+def render_quote_text_internal(req: QuoteCalculateRequest, quote: QuoteResult) -> str:
+    lines = [
+        "【报价通知】",
+        f"学生: {req.student_info.name} / {req.student_info.phone}",
+        f"操作人: {req.operator_name}   来源: {req.source}",
+        f"年级: {req.grade}",
+        f"班型与科目: {'、'.join(req.class_subjects)}",
+        f"上课方式: {req.class_mode}",
+        f"原价: {_format_price(quote.base_price)}",
+        f"优惠: {_format_price(quote.discount_total)}",
+        f"报价: {_format_price(quote.final_price)}",
+        f"算式: {quote.pricing_formula}",
+        f"有效期: {quote.quote_valid_until.strftime('%y/%m/%d %H:%M:%S 中国标准时间')}",
+    ]
+
+    if req.mode_details:
+        mode_details = json.dumps(req.mode_details, ensure_ascii=False, sort_keys=True)
+        lines.append(f"混合模式明细: {mode_details}")
+
+    if req.discounts:
+        lines.append("手选优惠:")
+        lines.extend(
+            f"- {item.name}: {_format_price(item.amount)}"
+            f"{f' (老生ID:{item.history_student_id})' if item.history_student_id else ''}"
+            for item in req.discounts
+        )
+
+    if quote.non_price_benefits:
+        lines.append("系统提示:")
         lines.extend(f"- {item}" for item in quote.non_price_benefits)
 
     return "\n".join(lines)

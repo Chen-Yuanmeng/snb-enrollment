@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from app.schemas import DiscountItem, QuoteCalculateRequest, StudentInfoInput
-from app.pricing_engine import build_quote
+from app.pricing_engine import build_quote, render_quote_text_internal
 
 
 def _base_req(**kwargs):
@@ -28,6 +28,15 @@ def test_g2_offline_base_price():
     assert quote.final_price == 9880
     assert "张三 / 13800000000" in quote.quote_text
     assert "提示:" in quote.quote_text
+
+
+def test_internal_quote_text_differs_from_front_text():
+    req = _base_req()
+    quote = build_quote(req, now=datetime.fromisoformat("2026-05-10T12:00:00"))
+    internal_text = render_quote_text_internal(req, quote)
+    assert "【报价通知-内部】" in internal_text
+    assert "操作人: 张老师" in internal_text
+    assert internal_text != quote.quote_text
 
 
 def test_mutual_exclusion_discount():

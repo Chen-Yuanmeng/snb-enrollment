@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.errors import raise_biz_error
-from app.pricing_engine import build_quote
+from app.pricing_engine import build_quote, render_quote_text_internal
 from app.schemas import QuoteCalculateRequest
 from app.services.shared_service import inject_auto_discounts
 from app.services import notification_service
@@ -16,7 +16,7 @@ def calculate_quote(db: Session, payload: QuoteCalculateRequest) -> dict:
             notification_service.enqueue_typed_text(
                 db=db,
                 message_type="quotation",
-                text=quote.quote_text,
+                text=render_quote_text_internal(effective_payload, quote),
             )
         except Exception:
             # 通知链路异常不影响报价主流程。
