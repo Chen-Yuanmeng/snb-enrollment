@@ -51,6 +51,10 @@
 - 参数：grade（路径参数，必须与规则中的年级名称一致）
 - 返回：对应年级规则 JSON（class_modes、class_subject_groups、constraints、pricing、discounts、quote_validity、ui_hints）
 
+### GET /rules/accommodation
+- 说明：获取住宿报名规则（酒店、房型、时长、默认每晚价格）
+- 返回：`backend/rules/accommodation.json` 的完整内容
+
 ## 2. 学生与老生查询
 ### GET /students/search
 - 参数：keyword（必填）
@@ -166,6 +170,42 @@
 ## 7. 健康检查
 ### GET /health
 - 返回：服务状态与数据库连通状态
+
+## 8. 住宿报名与确认
+### POST /accommodations
+- 说明：生成住宿报价单并落库
+- 入参：
+  - operator_name
+  - source
+  - related_enrollment_id（可关联任意课程报价单）
+  - hotel
+  - room_type
+  - other_room_type_name（`room_type=其他房型` 时必填）
+  - duration_days（31/27/23）
+  - gender（男/女）
+  - nightly_price（仅 `其他房型` 时必填，默认房型按规则自动取价）
+  - note（可选）
+- 返回：accommodation_id, status, quote_text, nightly_price, total_price
+
+### GET /accommodations
+- 参数（可选）：status, hotel, room_type, gender, source, keyword, page, page_size, limit
+- keyword 支持：学生姓名模糊匹配；纯数字按住宿单ID/关联课程报价单ID匹配
+- 返回：住宿报价列表 + 分页元数据
+
+### POST /accommodations/{accommodation_id}/status
+- 入参：operator_name, source, status(`confirmed`/`cancelled`), note（可选）
+- 状态流转：
+  - generated -> confirmed / cancelled
+  - confirmed -> cancelled
+  - cancelled -> 不允许再改
+
+### GET /accommodations/stats
+- 说明：统计住宿人数（仅统计 confirmed）
+- 维度：酒店 + 房型 + 性别
+
+### GET /accommodations/related-enrollments/search
+- 说明：搜索可关联的课程报价单
+- 参数（可选）：keyword, page, page_size, limit
 
 ## 状态流转
 - quoted -> paid

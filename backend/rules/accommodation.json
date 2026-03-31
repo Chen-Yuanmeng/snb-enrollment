@@ -1,0 +1,67 @@
+{
+  "version": "2026.03.31",
+  "hotels": ["酒店1", "酒店2", "酒店3", "酒店4", "酒店5"],
+  "room_types": [
+    {
+      "name": "标间拼房",
+      "requires_custom_price": false
+    },
+    {
+      "name": "标间包间",
+      "requires_custom_price": false
+    },
+    {
+      "name": "大床房包间",
+      "requires_custom_price": false
+    },
+    {
+      "name": "其他房型",
+      "requires_custom_price": true
+    }
+  ],
+  "durations": [
+    {
+      "days": 31,
+      "label": "31天 (28天课)",
+      "is_default": true
+    },
+    {
+      "days": 27,
+      "label": "27天 (24天课)",
+      "is_default": false
+    },
+    {
+      "days": 23,
+      "label": "23天 (21天课)",
+      "is_default": false
+    }
+  ],
+  "genders": ["男", "女"],
+  "nightly_prices": {
+    "酒店1": {
+      "标间拼房": 65,
+      "标间包间": 130,
+      "大床房包间": 130
+    },
+    "酒店2": {
+      "标间拼房": 80,
+      "标间包间": 160,
+      "大床房包间": 160
+    },
+    "酒店3": {
+      "标间拼房": 80,
+      "标间包间": 160,
+      "大床房包间": 160
+    },
+    "酒店4": {
+      "标间拼房": 80,
+      "标间包间": 160,
+      "大床房包间": 160
+    },
+    "酒店5": {
+      "标间拼房": 105,
+      "标间包间": 210,
+      "大床房包间": 210
+    }
+  }
+}

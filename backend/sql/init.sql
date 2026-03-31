@@ -60,6 +60,34 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_quote_valid_until ON enrollments(quot
 CREATE INDEX IF NOT EXISTS idx_enrollments_fingerprint ON enrollments(quote_fingerprint);
 CREATE INDEX IF NOT EXISTS idx_enrollments_source ON enrollments(source);
 
+CREATE TABLE IF NOT EXISTS accommodation_enrollments (
+    id BIGSERIAL PRIMARY KEY,
+    related_enrollment_id BIGINT NOT NULL REFERENCES enrollments(id),
+    hotel VARCHAR(50) NOT NULL,
+    room_type VARCHAR(50) NOT NULL,
+    other_room_type_name VARCHAR(100) NULL,
+    duration_days INTEGER NOT NULL,
+    duration_label VARCHAR(50) NOT NULL,
+    gender VARCHAR(10) NOT NULL,
+    nightly_price NUMERIC(12,2) NOT NULL,
+    total_price NUMERIC(12,2) NOT NULL,
+    quote_text TEXT NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    operator_name VARCHAR(50) NOT NULL,
+    source VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    note TEXT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_accommodation_related_enrollment
+    ON accommodation_enrollments(related_enrollment_id);
+CREATE INDEX IF NOT EXISTS idx_accommodation_hotel_room_gender
+    ON accommodation_enrollments(hotel, room_type, gender);
+CREATE INDEX IF NOT EXISTS idx_accommodation_status ON accommodation_enrollments(status);
+CREATE INDEX IF NOT EXISTS idx_accommodation_source ON accommodation_enrollments(source);
+CREATE INDEX IF NOT EXISTS idx_accommodation_created_at ON accommodation_enrollments(created_at);
+
 CREATE TABLE IF NOT EXISTS refunds (
     id BIGSERIAL PRIMARY KEY,
     original_enrollment_id BIGINT NOT NULL REFERENCES enrollments(id),

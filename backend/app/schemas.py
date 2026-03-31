@@ -88,6 +88,64 @@ class BatchPayRequest(BaseModel):
     enrollment_ids: list[int]
 
 
+class AccommodationCreateRequest(BaseModel):
+    operator_name: str = Field(min_length=1, max_length=50)
+    source: str = Field(min_length=1, max_length=50)
+    related_enrollment_id: int
+    hotel: str = Field(min_length=1, max_length=50)
+    room_type: str = Field(min_length=1, max_length=50)
+    other_room_type_name: str | None = Field(default=None, max_length=100)
+    duration_days: int
+    gender: str = Field(min_length=1, max_length=10)
+    nightly_price: float | None = None
+    note: str | None = None
+
+    @field_validator("hotel", "room_type", "other_room_type_name", "gender", "note")
+    @classmethod
+    def trim_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        return trimmed or None
+
+
+class AccommodationStatusUpdateRequest(BaseModel):
+    operator_name: str = Field(min_length=1, max_length=50)
+    source: str = Field(min_length=1, max_length=50)
+    status: Literal["confirmed", "cancelled"]
+    note: str | None = None
+
+    @field_validator("note")
+    @classmethod
+    def trim_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        return trimmed or None
+
+
+class AccommodationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    related_enrollment_id: int
+    hotel: str
+    room_type: str
+    other_room_type_name: str | None
+    duration_days: int
+    duration_label: str
+    gender: str
+    nightly_price: float
+    total_price: float
+    quote_text: str
+    status: str
+    source: str
+    operator_name: str
+    note: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class RefundPreviewRequest(BaseModel):
     operator_name: str = Field(min_length=1, max_length=50)
     source: str = Field(min_length=1, max_length=50)

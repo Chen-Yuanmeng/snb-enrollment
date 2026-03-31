@@ -24,6 +24,11 @@ def get_rules_index() -> dict[str, Any]:
 
 
 @lru_cache(maxsize=1)
+def get_accommodation_rule() -> dict[str, Any]:
+    return _read_json(_rules_root() / "accommodation.json")
+
+
+@lru_cache(maxsize=1)
 def get_enabled_grade_rules() -> list[dict[str, Any]]:
     index = get_rules_index()
     grades = index.get("grades", [])

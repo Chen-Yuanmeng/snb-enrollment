@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from .routers.accommodations import router as accommodations_router
 from .routers.enrollments import router as enrollments_router
 from .routers.logs import router as logs_router
 from .routers.notifications import router as notifications_router
@@ -13,6 +14,7 @@ from .routers.system import router as system_router
 api_router = APIRouter()
 api_router.include_router(system_router)
 api_router.include_router(rules_router)
+api_router.include_router(accommodations_router)
 api_router.include_router(students_router)
 api_router.include_router(students_history_router)
 api_router.include_router(quotes_router)

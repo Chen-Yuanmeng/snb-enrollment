@@ -100,7 +100,38 @@
 - 固定公式：`refund_amount = old_price - new_price`。
 - 当差额小于等于 0 时自动拒绝。
 
-## 5. operation_logs（操作日志表）
+## 5. accommodation_enrollments（住宿报价表）
+- id BIGSERIAL PRIMARY KEY
+- related_enrollment_id BIGINT NOT NULL REFERENCES enrollments(id)
+- hotel VARCHAR(50) NOT NULL
+- room_type VARCHAR(50) NOT NULL
+- other_room_type_name VARCHAR(100) NULL
+- duration_days INTEGER NOT NULL
+- duration_label VARCHAR(50) NOT NULL
+- gender VARCHAR(10) NOT NULL
+- nightly_price NUMERIC(12,2) NOT NULL
+- total_price NUMERIC(12,2) NOT NULL
+- quote_text TEXT NOT NULL
+- status VARCHAR(30) NOT NULL
+- operator_name VARCHAR(50) NOT NULL
+- source VARCHAR(50) NOT NULL
+- created_at TIMESTAMP NOT NULL DEFAULT NOW()
+- updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+- note TEXT NULL
+
+状态：
+- generated
+- confirmed
+- cancelled
+
+索引：
+- idx_accommodation_related_enrollment(related_enrollment_id)
+- idx_accommodation_hotel_room_gender(hotel, room_type, gender)
+- idx_accommodation_status(status)
+- idx_accommodation_source(source)
+- idx_accommodation_created_at(created_at)
+
+## 6. operation_logs（操作日志表）
 - id BIGSERIAL PRIMARY KEY
 - operator_name VARCHAR(50) NOT NULL
 - source VARCHAR(50) NOT NULL

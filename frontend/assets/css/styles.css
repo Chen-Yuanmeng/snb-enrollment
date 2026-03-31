@@ -154,7 +154,7 @@ textarea {
   font: inherit;
   border-radius: 8px;
   border: 1px solid #bda67f;
-  padding: 3px 10px;
+  padding: 3px 6px;
   min-height: 30px;
   background: #fff;
 }
@@ -402,6 +402,15 @@ button.secondary {
   background: #e8f2ff;
 }
 
+.amount-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #4c5b2a;
+  background: #edf4dd;
+}
+
 .grade-pill {
   display: inline-block;
   padding: 1px 8px;
@@ -499,6 +508,31 @@ button.secondary {
   color: #697487;
 }
 
+.other-room-wrap {
+  margin-top: 8px;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px dashed #d8d8d8;
+  background: #fbfbfb;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.stats-table th,
+.stats-table td {
+  border: 1px solid #d8d8d8;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.stats-table th {
+  background: #f4f7fc;
+}
+
 .hidden {
   display: none;
 }
@@ -514,6 +548,12 @@ button.secondary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.enrollment-select {
+  width: 100%;
+  max-width: 420px;
+  min-width: 0;
 }
 
 @media (min-width: 760px) {
@@ -536,14 +576,14 @@ button.secondary {
   }
 
   .operator-box {
-    grid-template-columns: auto 96px;
+    grid-template-columns: auto 72px;
     justify-content: end;
     width: auto;
   }
 
   .operator-box select {
-    width: 96px;
-    min-width: 96px;
+    width: 72px;
+    min-width: 72px;
   }
 
   .quick-links {

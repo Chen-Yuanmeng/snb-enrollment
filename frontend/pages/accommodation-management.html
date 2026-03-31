@@ -3,20 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>已生成报价管理</title>
-    <link rel="stylesheet" href="../assets/css/styles.css?v=20260327b" />
+    <title>住宿报价确认</title>
+    <link rel="stylesheet" href="../assets/css/styles.css?v=20260331a" />
   </head>
   <body>
     <header class="topbar">
       <div class="topbar-main">
-        <h1>已生成报价管理</h1>
+        <h1>住宿报价确认</h1>
         <nav class="topbar-links">
-          <a href="../index.html" target="_blank" rel="noopener noreferrer">返回报名页面</a>
+          <a href="../index.html" target="_blank" rel="noopener noreferrer">返回课程报名页面</a>
           <a href="./accommodations.html" target="_blank" rel="noopener noreferrer">住宿报名页面</a>
-          <a href="./accommodation-management.html" target="_blank" rel="noopener noreferrer">住宿报价确认</a>
           <a href="./accommodation-stats.html" target="_blank" rel="noopener noreferrer">住宿统计</a>
-          <a href="./refunds.html" target="_blank" rel="noopener noreferrer">报名调整页面</a>
-          <a href="./old-students.html" target="_blank" rel="noopener noreferrer">老生管理页面</a>
+          <a href="./enrollments.html" target="_blank" rel="noopener noreferrer">课程报价管理</a>
         </nav>
       </div>
       <div class="operator-box">
@@ -36,21 +34,22 @@
         <h2>筛选条件</h2>
         <div class="field-grid three-col">
           <label>
-            学生姓名
-            <input id="studentNameFilter" type="text" placeholder="请输入学生姓名" />
-          </label>
-          <label>
-            年级
-            <select id="gradeFilter">
-              <option value="">全部年级</option>
-            </select>
+            关键词
+            <input id="keywordFilter" type="text" placeholder="学生姓名/住宿单ID/课程报价单ID" />
           </label>
           <label>
             状态
             <select id="statusFilter">
               <option value="">全部</option>
-              <option value="quoted">已报价</option>
-              <option value="paid">已缴费</option>
+              <option value="generated" selected>已生成</option>
+              <option value="confirmed">已确认</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </label>
+          <label>
+            酒店
+            <select id="hotelFilter">
+              <option value="">全部酒店</option>
             </select>
           </label>
         </div>
@@ -60,12 +59,12 @@
       </section>
 
       <section class="card">
-        <h2>报名记录</h2>
-        <div id="enrollmentPagination" class="pagination"></div>
-        <div id="enrollmentList">加载中...</div>
+        <h2>住宿报价列表</h2>
+        <div id="accommodationPagination" class="pagination"></div>
+        <div id="accommodationList">加载中...</div>
       </section>
     </main>
 
-    <script src="../assets/js/enrollments.js?v=20260327b"></script>
+    <script src="../assets/js/accommodation-management.js?v=20260331a"></script>
   </body>
 </html>

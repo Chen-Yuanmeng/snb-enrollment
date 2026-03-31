@@ -25,3 +25,8 @@ def get_rules_meta() -> ApiResponse:
 @router.get(f"{config.api_prefix}/rules/grade/{{grade}}", response_model=ApiResponse)
 def get_rule_by_grade(grade: str) -> ApiResponse:
     return ApiResponse(data=rule_service.get_rule_by_grade(grade))
+
+
+@router.get(f"{config.api_prefix}/rules/accommodation", response_model=ApiResponse)
+def get_accommodation_meta() -> ApiResponse:
+    return ApiResponse(data=rule_service.get_accommodation_meta())

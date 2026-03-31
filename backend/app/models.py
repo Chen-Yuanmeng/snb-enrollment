@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
@@ -96,6 +96,35 @@ class Refund(Base):
     operator_name: Mapped[str] = mapped_column(String(50), nullable=False)
     source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AccommodationEnrollment(Base):
+    __tablename__ = "accommodation_enrollments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    related_enrollment_id: Mapped[int] = mapped_column(
+        ForeignKey("enrollments.id"), nullable=False, index=True
+    )
+    hotel: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    room_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    other_room_type_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    duration_days: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    duration_label: Mapped[str] = mapped_column(String(50), nullable=False)
+    gender: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+
+    nightly_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    total_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    quote_text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    status: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    operator_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow_naive, onupdate=utcnow_naive, index=True
+    )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
