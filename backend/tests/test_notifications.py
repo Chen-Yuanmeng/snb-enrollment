@@ -39,6 +39,28 @@ def test_enqueue_typed_text_creates_task(monkeypatch):
         db.close()
 
 
+def test_enqueue_accommodation_type_creates_task(monkeypatch):
+    db = _make_session()
+    try:
+        monkeypatch.setattr(
+            notification_service.wecom_config,
+            "type_webhook_env_mapping_raw",
+            '{"accommodation":"WECOM_WEBHOOK_ACCOMMODATION"}',
+        )
+        monkeypatch.setenv(
+            "WECOM_WEBHOOK_ACCOMMODATION",
+            "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=accommodation",
+        )
+        monkeypatch.setattr(notification_service, "enqueue_task", lambda task_id: None)
+
+        task = notification_service.enqueue_typed_text(db, "accommodation", "hello")
+        assert task.id > 0
+        assert task.webhook_url == "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=accommodation"
+        assert task.status == "pending"
+    finally:
+        db.close()
+
+
 def test_enqueue_typed_text_requires_mapping():
     db = _make_session()
     try:

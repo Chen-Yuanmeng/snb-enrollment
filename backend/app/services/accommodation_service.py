@@ -13,6 +13,7 @@ from app.errors import raise_biz_error
 from app.models import AccommodationEnrollment, Enrollment, Student
 from app.rules_loader import get_accommodation_rule
 from app.schemas import AccommodationCreateRequest, AccommodationOut, AccommodationStatusUpdateRequest
+from app.services import notification_service
 from app.services.shared_service import log_operation
 
 
@@ -111,6 +112,34 @@ def _render_quote_text(payload: AccommodationCreateRequest, context: dict[str, A
             "状态: 已生成",
         ]
     )
+
+
+def _render_status_change_notice(
+    student_name: str,
+    related_enrollment_id: int,
+    hotel: str,
+    room_type_display: str,
+    duration_label: str,
+    gender: str,
+    total_price: float,
+    target_status: str,
+) -> str:
+    lines = [
+        f"学生姓名: {student_name}",
+        f"关联课程报价单号: {related_enrollment_id}",
+        f"{hotel} | {room_type_display}",
+        f"{duration_label} | {gender}",
+    ]
+    if target_status == ACCOMMODATION_STATUS_CONFIRMED:
+        lines = ["【住宿 - 交费通知】"] + lines
+        lines.append(f"住宿费 ¥{total_price:.2f} 已交")
+        return "\n".join(lines)
+    elif target_status == ACCOMMODATION_STATUS_CANCELLED:
+        lines = ["【住宿 - 取消通知】"] + lines
+        lines.append(f"住宿费之前已交 ¥{total_price:.2f} 需退款")
+        return "\n".join(lines)
+    else:
+        return ""
 
 
 def create_accommodation(db: Session, payload: AccommodationCreateRequest) -> dict[str, Any]:
@@ -299,6 +328,38 @@ def update_accommodation_status(
         },
     )
     db.commit()
+
+    should_send_notice = (
+        (current == ACCOMMODATION_STATUS_GENERATED and target == ACCOMMODATION_STATUS_CONFIRMED)
+        or (current == ACCOMMODATION_STATUS_CONFIRMED and target == ACCOMMODATION_STATUS_CANCELLED)
+    )
+    if should_send_notice:
+        related = db.get(Enrollment, row.related_enrollment_id)
+        student_name = "-"
+        if related:
+            student = db.get(Student, related.student_id)
+            if student and student.name:
+                student_name = student.name
+
+        try:
+            notification_service.enqueue_typed_text(
+                db=db,
+                message_type="accommodation",
+                text=_render_status_change_notice(
+                    student_name=student_name,
+                    related_enrollment_id=row.related_enrollment_id,
+                    hotel=row.hotel,
+                    room_type_display=_get_room_type_display(row.room_type, row.other_room_type_name),
+                    duration_label=row.duration_label,
+                    gender=row.gender,
+                    total_price=float(row.total_price),
+                    target_status=target,
+                ),
+            )
+        except Exception:
+            # 通知链路异常不影响状态流转主流程。
+            pass
+
     return {"accommodation_id": row.id, "status": row.status}
 
 

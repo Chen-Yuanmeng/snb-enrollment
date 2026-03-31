@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.models import Enrollment, Student
+from app.rules_loader import get_accommodation_rule
 from app.schemas import AccommodationCreateRequest, AccommodationStatusUpdateRequest
 from app.services import accommodation_service
 
@@ -68,9 +69,12 @@ def test_create_accommodation_with_default_price():
             note="测试备注",
         )
         result = accommodation_service.create_accommodation(db, payload)
+        rule = get_accommodation_rule()
+        nightly_price = float(rule["nightly_prices"]["酒店1"]["标间拼房"])
+        total_price = round(nightly_price * 31, 2)
         assert result["status"] == "generated"
-        assert result["nightly_price"] == 120.0
-        assert result["total_price"] == 3720.0
+        assert result["nightly_price"] == nightly_price
+        assert result["total_price"] == total_price
         assert "【住宿报价】" in result["quote_text"]
     finally:
         db.close()
@@ -99,9 +103,80 @@ def test_create_other_room_type_requires_custom_fields():
         db.close()
 
 
-def test_accommodation_status_flow():
+def test_accommodation_status_flow(monkeypatch):
     db = _make_session()
     try:
+        sent_messages = []
+        monkeypatch.setattr(
+            accommodation_service.notification_service,
+            "enqueue_typed_text",
+            lambda db, message_type, text: sent_messages.append(
+                {"message_type": message_type, "text": text}
+            ),
+        )
+
+        related_enrollment_id = _seed_enrollment(db)
+        create_payload = AccommodationCreateRequest(
+            operator_name="测试",
+            source="测试",
+            related_enrollment_id=related_enrollment_id,
+            hotel="酒店1",
+            room_type="标间拼房",
+            duration_days=31,
+            gender="男",
+        )
+        created = accommodation_service.create_accommodation(db, create_payload)
+        accommodation_id = created["accommodation_id"]
+        expected_total_price = created["total_price"]
+
+        confirmed = accommodation_service.update_accommodation_status(
+            db,
+            accommodation_id,
+            AccommodationStatusUpdateRequest(operator_name="测试", source="测试", status="confirmed"),
+        )
+        assert confirmed["status"] == "confirmed"
+        assert len(sent_messages) == 1
+        assert sent_messages[0]["message_type"] == "accommodation"
+        assert "住宿单状态: 已交费" in sent_messages[0]["text"]
+        assert f"住宿费 ¥{expected_total_price:.2f} 已交" in sent_messages[0]["text"]
+
+        cancelled = accommodation_service.update_accommodation_status(
+            db,
+            accommodation_id,
+            AccommodationStatusUpdateRequest(operator_name="测试", source="测试", status="cancelled"),
+        )
+        assert cancelled["status"] == "cancelled"
+        assert len(sent_messages) == 2
+        assert sent_messages[1]["message_type"] == "accommodation"
+        assert "住宿单状态: 已退费" in sent_messages[1]["text"]
+        assert f"住宿费之前已交 ¥{expected_total_price:.2f} 需退款" in sent_messages[1]["text"]
+
+        with pytest.raises(HTTPException) as exc:
+            accommodation_service.update_accommodation_status(
+                db,
+                accommodation_id,
+                AccommodationStatusUpdateRequest(
+                    operator_name="测试", source="测试", status="cancelled"
+                ),
+            )
+        assert exc.value.detail["code"] == 40005
+        assert len(sent_messages) == 2
+    finally:
+        db.close()
+
+
+def test_generated_to_cancelled_does_not_send_notification(monkeypatch):
+    db = _make_session()
+    try:
+        sent_messages = []
+        monkeypatch.setattr(
+            accommodation_service.notification_service,
+            "enqueue_typed_text",
+            lambda db, message_type, text: sent_messages.append(
+                {"message_type": message_type, "text": text}
+            ),
+        )
+
         related_enrollment_id = _seed_enrollment(db)
         create_payload = AccommodationCreateRequest(
             operator_name="测试",
@@ -115,28 +190,12 @@ def test_accommodation_status_flow():
         created = accommodation_service.create_accommodation(db, create_payload)
         accommodation_id = created["accommodation_id"]
 
-        confirmed = accommodation_service.update_accommodation_status(
-            db,
-            accommodation_id,
-            AccommodationStatusUpdateRequest(operator_name="测试", source="测试", status="confirmed"),
-        )
-        assert confirmed["status"] == "confirmed"
-
         cancelled = accommodation_service.update_accommodation_status(
             db,
             accommodation_id,
             AccommodationStatusUpdateRequest(operator_name="测试", source="测试", status="cancelled"),
         )
         assert cancelled["status"] == "cancelled"
-
-        with pytest.raises(HTTPException) as exc:
-            accommodation_service.update_accommodation_status(
-                db,
-                accommodation_id,
-                AccommodationStatusUpdateRequest(
-                    operator_name="测试", source="测试", status="cancelled"
-                ),
-            )
-        assert exc.value.detail["code"] == 40005
+        assert sent_messages == []
     finally:
         db.close()

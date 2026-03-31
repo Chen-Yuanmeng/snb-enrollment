@@ -208,7 +208,7 @@ class StudentHistoryOut(BaseModel):
 class NotificationSendRequest(BaseModel):
     operator_name: str = Field(min_length=1, max_length=50)
     source: str = Field(min_length=1, max_length=50)
-    type: Literal["quotation", "payment", "adjustment", "refund"]
+    type: Literal["quotation", "payment", "adjustment", "refund", "accommodation"]
     text: str = Field(min_length=1, max_length=4000)
 
 
