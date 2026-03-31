@@ -9,7 +9,7 @@ from .models import Student, StudentHistory
 from .class_subject_meta import GRADE_CLASS_SUBJECT_OPTIONS
 from .constants import NON_EARLY_BIRD_VALID_UNTIL
 from .rules_loader import get_grade_rule
-from .schemas import QuoteCalculateRequest, QuoteResult, DiscountItem
+from .schemas import QuoteCalculateRequest, QuoteResult
 
 
 EARLY_BIRD_STAGE_1 = datetime.fromisoformat("2026-05-15T23:59:59")
@@ -445,22 +445,22 @@ def _calc_discounts(req: QuoteCalculateRequest, now: datetime) -> tuple[float, d
         total_discount += amount
         discount_info[name] = discount_info.get(name, 0.0) + amount
 
-        if name in {"老带新", "老生续报"} and history_student_id:
-            non_price_benefits.append(f"优惠关联老生ID: {history_student_id}")
+        if name == "老带新" and history_student_id:
+            non_price_benefits.append(f"老学员 {_get_name_and_info_from_student_id(history_student_id)} 在新学员暑假结课后可根据规则获得奖励")
 
-    if req.grade in {"新高一暑期", "新高二暑期", "新高三暑期", "初中/小学暑期"}:
+    if req.grade in {"新高一暑", "新高二暑", "新高三暑", "初中/小学暑期"}:
         if req.grade == "初中/小学暑期":
-            non_price_benefits.append("全勤奖提示: 28天课程每科结课后可返100元")
-        elif req.grade == "新高一暑期":
-            non_price_benefits.append("全勤奖提示: 28天课程每科结课后可返100元")
+            non_price_benefits.append("课程结束后，每科满勤返现100元。21天课程不发放全勤奖。")
+        elif req.grade == "新高一暑":
+            non_price_benefits.append("课程结束后，每科满勤返现（语文+英语视为1科）100元。21天课程不发放全勤奖。")
         else:
-            non_price_benefits.append("全勤奖提示: 每科结课后可返100元（仅提示，不计价）")
+            non_price_benefits.append("课程结束后，每科满勤返现100元。")
 
     if req.grade in _early_bird_grades():
         if stage == 1:
-            non_price_benefits.append("命中早鸟第一阶段")
+            non_price_benefits.append("本次报价享受早鸟第一阶段优惠，请注意报价有效期。")
         elif stage == 2:
-            non_price_benefits.append("命中早鸟第二阶段")
+            non_price_benefits.append("本次报价享受早鸟第二阶段优惠，请注意报价有效期。")
 
     return total_discount, discount_info, non_price_benefits
 
@@ -512,16 +512,33 @@ def _get_name_and_info_from_student_id(student_id: int) -> str:
     return f"{default_name} (ID: {student_id}, {default_grade})"
 
 
-def _render_discount_info_text(discounts: list[DiscountItem]) -> str:
-    if not discounts:
+def _render_discount_info_text(quote: QuoteResult) -> str:
+    if not quote.discount_info:
         return ""
+
+    snapshot_discounts = quote.pricing_snapshot.get("discounts", [])
+    history_student_ids_by_name: dict[str, int] = {}
+    if isinstance(snapshot_discounts, list):
+        for item in snapshot_discounts:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name", "")).strip()
+            history_student_id = item.get("history_student_id")
+            if name and isinstance(history_student_id, int):
+                history_student_ids_by_name.setdefault(name, history_student_id)
+
     lines = []
-    
-    for idx, discount in enumerate(discounts):
-        name = discount.name
-        amount = discount.amount
+
+    for idx, (name, amount) in enumerate(quote.discount_info.items()):
         if name == "老带新":
-            lines.append(f"{idx + 1}. {name}优惠: {_format_price(amount)} (关联老生: {_get_name_and_info_from_student_id(int(amount))})")
+            history_student_id = history_student_ids_by_name.get(name)
+            if history_student_id:
+                lines.append(
+                    f"{idx + 1}. {name}优惠: {_format_price(amount)} "
+                    f"(关联老生: {_get_name_and_info_from_student_id(history_student_id)})"
+                )
+            else:
+                lines.append(f"{idx + 1}. {name}优惠: {_format_price(amount)}")
             continue
         else:
             lines.append(f"{idx + 1}. {name}: {_format_price(amount)}")
@@ -542,6 +559,16 @@ def _render_mixed_mode_details_text(mode_details: dict[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def _render_prompt_text(quote: QuoteResult, start_number: int = 2) -> str:
+    lines = []
+    if quote.non_price_benefits:
+        for idx, item in enumerate(quote.non_price_benefits, start=start_number):
+            lines.append(f"{idx}. {item}")
+    else:
+        return ""
+    return "\n".join(lines)
+
+
 def render_quote_text(req: QuoteCalculateRequest, quote: QuoteResult) -> str:
     """
     生成给家长的报价文本，包含报价详情和优惠信息等。
@@ -556,18 +583,17 @@ def render_quote_text(req: QuoteCalculateRequest, quote: QuoteResult) -> str:
         f"{'、'.join(req.class_subjects)}",
         f"上课方式: {req.class_mode if req.class_mode != '混合' else ('混合 (' + _render_mixed_mode_details_text(req.mode_details) + ')')}",
         "--------------------------------",
-        f"优惠:\n{_render_discount_info_text(req.discounts)}\n" \
-        "--------------------------------" if req.discounts else "",
+        f"优惠:\n{_render_discount_info_text(quote)}\n" \
+        "--------------------------------" if quote.discount_info else "",
         f"原价: {_format_price(quote.base_price)}",
         f"算式: {quote.pricing_formula}",
         "--------------------------------",
-        f"报价: {_format_price(quote.final_price)}",
-        f"有效期: {quote.quote_valid_until.strftime('%Y/%m/%d %H:%M:%S 中国标准时间')}",
+        f"报价: 【{_format_price(quote.final_price)}】",
+        "--------------------------------",
+        "提示:",
+        f"1. 本报价有效期至 {quote.quote_valid_until.strftime('%Y/%m/%d %H:%M:%S (北京时间)')}",
+        _render_prompt_text(quote, start_number=2)
     ]
-
-    if quote.non_price_benefits:
-        lines.append("提示:")
-        lines.extend(f"- {item}" for item in quote.non_price_benefits)
 
     return "\n".join(lines)
 
@@ -577,31 +603,18 @@ def render_quote_text_internal(req: QuoteCalculateRequest, quote: QuoteResult) -
         "【报价通知】",
         f"学生: {req.student_info.name} / {req.student_info.phone}",
         f"操作人: {req.operator_name}   来源: {req.source}",
-        f"年级: {req.grade}",
-        f"班型与科目: {'、'.join(req.class_subjects)}",
-        f"上课方式: {req.class_mode}",
+        "--------------------------------",
+        f"{req.grade}",
+        f"{'、'.join(req.class_subjects)}",
+        f"上课方式: {req.class_mode if req.class_mode != '混合' else ('混合 (' + _render_mixed_mode_details_text(req.mode_details) + ')')}",
+        "--------------------------------",
         f"原价: {_format_price(quote.base_price)}",
-        f"优惠: {_format_price(quote.discount_total)}",
+        f"优惠:\n{_render_discount_info_text(quote)}\n" \
+        "--------------------------------" if quote.discount_info else "",
         f"报价: {_format_price(quote.final_price)}",
         f"算式: {quote.pricing_formula}",
-        f"有效期: {quote.quote_valid_until.strftime('%y/%m/%d %H:%M:%S 中国标准时间')}",
+        f"报价有效期至 {quote.quote_valid_until.strftime('%Y/%m/%d %H:%M:%S (北京时间)')}",
     ]
-
-    if req.mode_details:
-        mode_details = json.dumps(req.mode_details, ensure_ascii=False, sort_keys=True)
-        lines.append(f"混合模式明细: {mode_details}")
-
-    if req.discounts:
-        lines.append("手选优惠:")
-        lines.extend(
-            f"- {item.name}: {_format_price(item.amount)}"
-            f"{f' (老生ID:{item.history_student_id})' if item.history_student_id else ''}"
-            for item in req.discounts
-        )
-
-    if quote.non_price_benefits:
-        lines.append("系统提示:")
-        lines.extend(f"- {item}" for item in quote.non_price_benefits)
 
     return "\n".join(lines)
 
