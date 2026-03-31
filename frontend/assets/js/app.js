@@ -62,6 +62,7 @@ const historyStudentSelect = document.querySelector("#historyStudentSelect");
 const searchHistoryBtn = document.querySelector("#searchHistory");
 const studentNameInput = document.querySelector("#studentName");
 const studentPhoneInput = document.querySelector("#studentPhone");
+let isDirty = false;
 
 const STORAGE_KEYS = {
   operator: "snb.selectedOperator",
@@ -77,6 +78,14 @@ let autoRenewalHistoryStudentId = 0;
 let autoRenewalIdentityKey = "";
 let autoWuyiCaseInput = 0;
 let autoWuyiIdentityKey = "";
+
+function markDirty() {
+  isDirty = true;
+}
+
+function clearDirty() {
+  isDirty = false;
+}
 
 function readStoredValue(key) {
   try {
@@ -910,9 +919,20 @@ quoteForm.addEventListener("submit", async (event) => {
     } catch (saveError) {
       quoteResult.textContent = `${text}\n\n报价已复制，但自动保存失败: ${saveError.message}`;
     }
+    clearDirty();
   } catch (error) {
     quoteResult.textContent = `报价失败: ${error.message}`;
   }
+});
+
+quoteForm.addEventListener("input", markDirty);
+quoteForm.addEventListener("change", markDirty);
+window.addEventListener("beforeunload", (event) => {
+  if (!isDirty) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = "";
 });
 
 searchHistoryBtn.addEventListener("click", searchHistory);

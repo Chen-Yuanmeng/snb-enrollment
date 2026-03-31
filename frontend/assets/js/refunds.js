@@ -44,6 +44,7 @@ async function resolveApiBase() {
 
 const operatorSelect = document.querySelector("#operator");
 const sourceSelect = document.querySelector("#source");
+const refundForm = document.querySelector("#refundForm");
 const searchKeywordInput = document.querySelector("#searchKeyword");
 const searchEnrollmentBtn = document.querySelector("#searchEnrollment");
 const searchResultSelect = document.querySelector("#searchResultSelect");
@@ -72,6 +73,15 @@ const STORAGE_KEYS = {
 let gradeRules = [];
 let currentSearchRows = [];
 let autofilledReferralHistoryStudentId = 0;
+let isDirty = false;
+
+function markDirty() {
+  isDirty = true;
+}
+
+function clearDirty() {
+  isDirty = false;
+}
 
 function readStoredValue(key) {
   try {
@@ -636,6 +646,7 @@ async function submitRefund() {
     if (!copied) {
       refundResult.textContent = `${content}\n\n提示: 当前浏览器不支持自动复制，请手动复制通知文案。`;
     }
+    clearDirty();
   } catch (error) {
     refundResult.textContent = `提交失败: ${error.message}`;
   }
@@ -685,6 +696,15 @@ searchResultSelect.addEventListener("change", () => {
   }
   const row = currentSearchRows.find((item) => item.id === id);
   applyEnrollmentToForm(row);
+});
+refundForm.addEventListener("input", markDirty);
+refundForm.addEventListener("change", markDirty);
+window.addEventListener("beforeunload", (event) => {
+  if (!isDirty) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = "";
 });
 searchEnrollmentBtn.addEventListener("click", searchPaidEnrollments);
 newGradeSelect.addEventListener("change", renderGradeRule);

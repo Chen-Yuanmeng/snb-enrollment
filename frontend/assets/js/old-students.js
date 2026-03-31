@@ -47,6 +47,7 @@ const newPhoneSuffixInput = document.querySelector("#newPhoneSuffix");
 const newNoteInput = document.querySelector("#newNote");
 const historyList = document.querySelector("#historyList");
 const historyPagination = document.querySelector("#historyPagination");
+let isDirty = false;
 
 const STORAGE_KEYS = {
   operator: "snb.selectedOperator",
@@ -59,6 +60,14 @@ const historyState = {
   total: 0,
   isLoading: false,
 };
+
+function markDirty() {
+  isDirty = true;
+}
+
+function clearDirty() {
+  isDirty = false;
+}
 
 function readStoredValue(key) {
   try {
@@ -283,6 +292,7 @@ async function createHistory(event) {
     newGradeInput.value = "";
     newPhoneSuffixInput.value = "";
     newNoteInput.value = "";
+    clearDirty();
 
     historyState.page = 1;
     await searchHistory();
@@ -319,6 +329,15 @@ resetBtn.addEventListener("click", async () => {
   await searchHistory();
 });
 createForm.addEventListener("submit", createHistory);
+createForm.addEventListener("input", markDirty);
+createForm.addEventListener("change", markDirty);
+window.addEventListener("beforeunload", (event) => {
+  if (!isDirty) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = "";
+});
 operatorSelect.addEventListener("change", () => {
   writeStoredValue(STORAGE_KEYS.operator, operatorSelect.value);
 });

@@ -47,6 +47,7 @@ const otherRoomTypeNameInput = document.querySelector("#otherRoomTypeName");
 const manualNightlyPriceInput = document.querySelector("#manualNightlyPrice");
 const noteInput = document.querySelector("#noteInput");
 const accommodationResult = document.querySelector("#accommodationResult");
+let isDirty = false;
 
 const STORAGE_KEYS = {
   operator: "snb.selectedOperator",
@@ -54,6 +55,14 @@ const STORAGE_KEYS = {
 };
 
 let accommodationRule = null;
+
+function markDirty() {
+  isDirty = true;
+}
+
+function clearDirty() {
+  isDirty = false;
+}
 
 function readStoredValue(key) {
   try {
@@ -308,9 +317,20 @@ accommodationForm.addEventListener("submit", async (event) => {
     const text = result.data?.quote_text || "";
     await copyText(text);
     accommodationResult.textContent = `${text}\n\n住宿报价单ID: ${result.data?.accommodation_id || "-"}（已复制）`;
+    clearDirty();
   } catch (error) {
     accommodationResult.textContent = `生成失败: ${error.message}`;
   }
+});
+
+accommodationForm.addEventListener("input", markDirty);
+accommodationForm.addEventListener("change", markDirty);
+window.addEventListener("beforeunload", (event) => {
+  if (!isDirty) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = "";
 });
 
 searchRelatedEnrollmentBtn.addEventListener("click", searchRelatedEnrollments);
