@@ -125,7 +125,7 @@ function mustOperatorAndSource() {
 }
 
 function fillNoteTemplate() {
-  noteInput.value = `与  同住`;
+  noteInput.value = `与  同住 (对方在该酒店还有空床位时交费锁定才有效)`;
   // move cursor to the middle for easy editing
   noteInput.focus();
   noteInput.setSelectionRange(2, 2);
