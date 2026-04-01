@@ -29,41 +29,41 @@
       },
       {
         "name": "高新领军4",
-        "pricing_strategy": "lingjun21"
+        "pricing_strategy": "lingjun28"
       },
       {
         "name": "高新卓越1",
-        "pricing_strategy": "lingjun28"
+        "pricing_strategy": "lingjun21"
       }
     ],
     [
       {
         "name": "高新二期领军5",
-        "pricing_strategy": "lingjun21"
+        "pricing_strategy": "lingjun24"
       },
       {
         "name": "高新二期卓越2",
-        "pricing_strategy": "lingjun21"
+        "pricing_strategy": "lingjun24"
       }
     ],
     [
       {
         "name": "中原领军1",
-        "pricing_strategy": "lingjun21"
+        "pricing_strategy": "lingjun24"
       },
       {
         "name": "中原领军1 (无语英)",
-        "pricing_strategy": "lingjun21nocnen"
+        "pricing_strategy": "lingjun24nocnen"
       }
     ],
     [
       {
         "name": "中原领军4",
-        "pricing_strategy": "lingjun21"
+        "pricing_strategy": "lingjun24"
       },
       {
         "name": "中原领军4 (无语英)",
-        "pricing_strategy": "lingjun21nocnen"
+        "pricing_strategy": "lingjun24nocnen"
       }
     ]
   ],
@@ -148,6 +148,29 @@
         "value": 400
       }
     ],
+    "early_bird_200_100": [
+      {
+        "name": "早鸟",
+        "enabled": true,
+        "strategy": "time_staged",
+        "params": {
+          "stages": [
+            {
+              "name": "第一阶段",
+              "time_start": "2026-03-01T00:00:00",
+              "time_end": "2026-05-15T23:59:59",
+              "value": 200
+            },
+            {
+              "name": "第二阶段",
+              "time_start": "2026-05-16T00:00:00",
+              "time_end": "2026-06-15T23:59:59",
+              "value": 100
+            }
+          ]
+        }
+      }
+    ],
     "early_bird_300_150": [
       {
         "name": "早鸟",
@@ -230,17 +253,30 @@
       "online_equation": "160*4*21",
       "discount_preset_refs": [
         "core_common",
-        "moment_300",
-        "early_bird_300_150"
+        "moment_400",
+        "early_bird_200_100"
       ],
       "available_discounts_overrides": []
     },
-    "lingjun21nocnen": {
+    "lingjun24": {
       "price_type": "fixed_total_by_mode",
-      "offline_total": 11340,
-      "online_total": 10080,
-      "offline_equation": "180*3*21",
-      "online_equation": "160*3*21",
+      "offline_total": 17280,
+      "online_total": 15360,
+      "offline_equation": "180*4*24",
+      "online_equation": "160*4*24",
+      "discount_preset_refs": [
+        "core_common",
+        "moment_400",
+        "early_bird_400_200"
+      ],
+      "available_discounts_overrides": []
+    },
+    "lingjun24nocnen": {
+      "price_type": "fixed_total_by_mode",
+      "offline_total": 12960,
+      "online_total": 11520,
+      "offline_equation": "180*3*24",
+      "online_equation": "160*3*24",
       "discount_preset_refs": [
         "core_common",
         "moment_300",

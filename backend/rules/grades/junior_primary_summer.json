@@ -32,15 +32,15 @@
     [
       {
         "name": "新七数学",
-        "pricing_strategy": "default"
+        "pricing_strategy": "cz_21"
       },
       {
         "name": "新八数学",
-        "pricing_strategy": "default"
+        "pricing_strategy": "cz_21"
       },
       {
         "name": "新七/八物理",
-        "pricing_strategy": "default"
+        "pricing_strategy": "cz_21"
       }
     ],
     [
@@ -74,7 +74,49 @@
       },
       {
         "name": "原版英语 (EIM 1)",
-        "pricing_strategy": "special_eim"
+        "pricing_strategy": "default"
+      }
+    ],
+    [
+      {
+        "name": "高一英才数学",
+        "pricing_strategy": "gy_3"
+      },
+      {
+        "name": "高一英才物理",
+        "pricing_strategy": "gy_3"
+      },
+      {
+        "name": "高一英才化学",
+        "pricing_strategy": "gy_2"
+      }
+    ],
+    [
+      {
+        "name": "高一领军1数学",
+        "pricing_strategy": "gy_2"
+      },
+      {
+        "name": "高一领军1物理",
+        "pricing_strategy": "gy_2"
+      },
+      {
+        "name": "高一领军1化学",
+        "pricing_strategy": "gy_2"
+      }
+    ],
+    [
+      {
+        "name": "高一领军3数学",
+        "pricing_strategy": "gy_2"
+      },
+      {
+        "name": "高一领军3物理",
+        "pricing_strategy": "gy_2"
+      },
+      {
+        "name": "高一领军3化学",
+        "pricing_strategy": "gy_2"
       }
     ]
   ],
@@ -92,7 +134,7 @@
     }
   },
   "discount_presets": {
-    "jp_core": [
+    "cz_core": [
       {
         "name": "老带新",
         "enabled": true,
@@ -125,15 +167,34 @@
       "offline_per_subject": 5040,
       "online_per_subject": 4480,
       "discount_preset_refs": [
-        "jp_core"
+        "cz_core"
       ],
       "available_discounts_overrides": []
     },
-    "special_eim": {
-      "price_type": "fixed_total",
-      "total": 6720,
+    "cz_21": {
+      "price_type": "per_subject_by_mode",
+      "offline_per_subject": 3780,
+      "online_per_subject": 3360,
       "discount_preset_refs": [
-        "jp_core"
+        "cz_core"
+      ],
+      "available_discounts_overrides": []
+    },
+    "gy_3": {
+      "price_type": "per_subject_by_mode",
+      "offline_per_subject": 7560,
+      "online_per_subject": 6720,
+      "discount_preset_refs": [
+        "cz_core"
+      ],
+      "available_discounts_overrides": []
+    },
+    "gy_2": {
+      "price_type": "per_subject_by_mode",
+      "offline_per_subject": 5040,
+      "online_per_subject": 4480,
+      "discount_preset_refs": [
+        "cz_core"
       ],
       "available_discounts_overrides": []
     }

@@ -17,6 +17,10 @@
       {
         "name": "英才物理",
         "pricing_strategy": "default"
+      },
+      {
+        "name": "英才化学",
+        "pricing_strategy": "default"
       }
     ],
     [
@@ -29,7 +33,7 @@
         "pricing_strategy": "default"
       },
       {
-        "name": "英才+领军2化学",
+        "name": "领军2化学",
         "pricing_strategy": "default"
       }
     ],
@@ -57,7 +61,7 @@
         "pricing_strategy": "default"
       },
       {
-        "name": "领军3+卓越化学",
+        "name": "领军3化学",
         "pricing_strategy": "default"
       }
     ],
@@ -68,6 +72,10 @@
       },
       {
         "name": "卓越物理",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "卓越化学",
         "pricing_strategy": "default"
       }
     ],
