@@ -54,12 +54,9 @@ def _seed_enrollment(db, student_id: int, status: str, final_price: float) -> En
         valid=True,
         operator_name="测试",
         source="测试",
-        chain_root_enrollment_id=None,
-        previous_enrollment_id=None,
     )
     db.add(enrollment)
     db.flush()
-    enrollment.chain_root_enrollment_id = enrollment.id
     return enrollment
 
 
@@ -81,7 +78,7 @@ def test_pay_enrollment_enqueues_payment_notice(monkeypatch):
     db = _make_session()
     try:
         student = _seed_student(db)
-        enrollment = _seed_enrollment(db, student.id, status="unconfirmed", final_price=980)
+        enrollment = _seed_enrollment(db, student.id, status="quoted", final_price=980)
         db.commit()
 
         calls: list[tuple[str, str]] = []
@@ -97,7 +94,7 @@ def test_pay_enrollment_enqueues_payment_notice(monkeypatch):
             PayRequest(operator_name="财务", source="前台", note="现场已收款"),
         )
 
-        assert result["status"] == "confirmed"
+        assert result["status"] == "paid"
         assert calls
         assert calls[0][0] == "payment"
         assert "报名交费通知" in calls[0][1]
@@ -109,8 +106,8 @@ def test_pay_batch_enqueues_payment_notice_for_each_success(monkeypatch):
     db = _make_session()
     try:
         student = _seed_student(db)
-        e1 = _seed_enrollment(db, student.id, status="unconfirmed", final_price=900)
-        e2 = _seed_enrollment(db, student.id, status="unconfirmed", final_price=1100)
+        e1 = _seed_enrollment(db, student.id, status="quoted", final_price=900)
+        e2 = _seed_enrollment(db, student.id, status="quoted", final_price=1100)
         db.commit()
 
         sent_types: list[str] = []
@@ -135,7 +132,7 @@ def test_adjustment_decrease_enqueues_adjustment_and_refund_notice(monkeypatch):
     db = _make_session()
     try:
         student = _seed_student(db)
-        old = _seed_enrollment(db, student.id, status="confirmed", final_price=12000)
+        old = _seed_enrollment(db, student.id, status="paid", final_price=12000)
         db.commit()
 
         sent_types: list[str] = []

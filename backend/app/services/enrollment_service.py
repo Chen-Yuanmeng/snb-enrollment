@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.constants import STATUS_CONFIRMED, STATUS_REFUNDED, STATUS_UNCONFIRMED
+from app.constants import STATUS_PAID, STATUS_QUOTED
 from app.core.datetime_utils import utcnow_naive
 from app.errors import raise_biz_error
 from app.models import Enrollment, Student
@@ -26,7 +26,7 @@ def _render_payment_notice(enrollment: Enrollment, student: Student | None) -> s
             f"实收金额: ¥{float(enrollment.final_price):.2f}",
             f"算式: {enrollment.pricing_formula}",
             f"来源: {enrollment.source or '-'}",
-            "状态: 已确认",
+            "状态: 已交费",
         ]
     )
 
@@ -64,7 +64,7 @@ def create_enrollment(db: Session, payload: EnrollmentCreateRequest) -> dict[str
             pricing_snapshot=quote.pricing_snapshot,
             quote_valid_until=quote.quote_valid_until,
             quote_fingerprint=fingerprint,
-            status=STATUS_UNCONFIRMED,
+            status=STATUS_QUOTED,
             valid=True,
             operator_name=effective_payload.operator_name,
             source=effective_payload.source,
@@ -72,7 +72,6 @@ def create_enrollment(db: Session, payload: EnrollmentCreateRequest) -> dict[str
         )
         db.add(row)
         db.flush()
-        row.chain_root_enrollment_id = row.id
 
         log_operation(
             db,
@@ -115,7 +114,6 @@ def list_enrollments(
     page: int = 1,
     page_size: int = 20,
     limit: int | None = None,
-    latest_only: bool = True,
 ) -> dict[str, Any]:
     normalized_page = page if isinstance(page, int) else 1
     normalized_page_size = page_size if isinstance(page_size, int) else 20
@@ -148,10 +146,6 @@ def list_enrollments(
             else:
                 filters.append(Student.name.ilike(f"%{trimmed}%"))
 
-    if latest_only:
-        latest_hidden_ids_stmt = select(Enrollment.previous_enrollment_id).where(Enrollment.previous_enrollment_id.is_not(None))
-        filters.append(~Enrollment.id.in_(latest_hidden_ids_stmt))
-
     if filters:
         data_stmt = data_stmt.where(*filters)
         count_stmt = count_stmt.where(*filters)
@@ -173,15 +167,6 @@ def list_enrollments(
         item["pricing_snapshot"] = enrollment.pricing_snapshot or {}
         item["base_price"] = float(enrollment.base_price)
         item["discount_total"] = float(enrollment.discount_total)
-        item["chain_root_enrollment_id"] = enrollment.chain_root_enrollment_id
-        item["previous_enrollment_id"] = enrollment.previous_enrollment_id
-        item["adjustment_tag"] = (
-            "已退费"
-            if enrollment.previous_enrollment_id is not None and enrollment.status == STATUS_REFUNDED
-            else "已调整"
-            if enrollment.previous_enrollment_id is not None
-            else ""
-        )
         data.append(item)
 
     return {
@@ -223,10 +208,10 @@ def pay_enrollment(db: Session, enrollment_id: int, payload: PayRequest) -> dict
     if row is None:
         raise_biz_error(40401, "记录不存在", status_code=404)
     row = cast(Enrollment, row)
-    if row.status not in {STATUS_UNCONFIRMED, "quoted"}:
+    if row.status != STATUS_QUOTED:
         raise_biz_error(40005, "状态流转非法")
 
-    row.status = STATUS_CONFIRMED
+    row.status = STATUS_PAID
     row.updated_at = utcnow_naive()
     row.note = payload.note or row.note
 
@@ -264,10 +249,10 @@ def pay_batch(db: Session, payload: BatchPayRequest) -> list[dict[str, Any]]:
         if not row:
             results.append({"enrollment_id": enrollment_id, "ok": False, "reason": "not found"})
             continue
-        if row.status not in {STATUS_UNCONFIRMED, "quoted"}:
+        if row.status != STATUS_QUOTED:
             results.append({"enrollment_id": enrollment_id, "ok": False, "reason": "invalid status"})
             continue
-        row.status = STATUS_CONFIRMED
+        row.status = STATUS_PAID
         row.updated_at = utcnow_naive()
         results.append({"enrollment_id": enrollment_id, "ok": True})
         paid_ids.append(row.id)

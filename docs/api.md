@@ -129,6 +129,18 @@
 ### GET /enrollments/{enrollment_id}
 - 返回：单条详情（含 class_subjects, source, 算式、快照、优惠明细）
 
+### GET /enrollments/stats
+- 说明：报名统计接口
+- 统计范围：仅包含 `confirmed`、`increased`、`partial_refunded`
+- 统计口径：对每条报名记录按 `class_subjects` 拆分后计数（一个报名可计入多个科目）
+- 线上/线下：
+  - `class_mode=线下`：该报名下科目计入线下
+  - `class_mode=线上`：该报名下科目计入线上
+  - `class_mode=混合`：按 `mode_details.offline_subjects / online_subjects` 将每个科目分别计入线下或线上
+- 返回：
+  - `rows[]`：`grade`, `subject`, `offline_count`, `online_count`, `total_count`
+  - `summary`：`total_rows`, `total_enrollment_subject_units`, `total_offline`, `total_online`
+
 ## 4. 缴费
 ### POST /enrollments/{enrollment_id}/pay
 - 入参：operator_name, source, note（可选）

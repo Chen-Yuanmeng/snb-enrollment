@@ -48,6 +48,11 @@ def list_enrollments(
     return ApiResponse(**result)
 
 
+@router.get(f"{config.api_prefix}/enrollments/stats", response_model=ApiResponse)
+def get_enrollment_stats(db: Session = Depends(get_db)) -> ApiResponse:
+    return ApiResponse(data=enrollment_service.get_enrollment_stats(db))
+
+
 @router.get(f"{config.api_prefix}/enrollments/{{enrollment_id}}", response_model=ApiResponse)
 def get_enrollment(enrollment_id: int, db: Session = Depends(get_db)) -> ApiResponse:
     return ApiResponse(data=enrollment_service.get_enrollment(db, enrollment_id))

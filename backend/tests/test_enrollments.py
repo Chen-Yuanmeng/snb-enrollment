@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from app.main import list_enrollments
 from app.models import Enrollment, Student
+from app.services.enrollment_service import get_enrollment_stats
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -184,5 +185,118 @@ def test_enrollments_default_to_latest_chain_node_only():
         ids = [item["id"] for item in with_history.data]
         assert old.id in ids
         assert new_row.id in ids
+    finally:
+        db.close()
+
+
+def test_enrollment_stats_subject_split_and_mode_buckets():
+    db = _make_session()
+    try:
+        _seed_enrollments(db)
+
+        extra_student = Student(name="赵六", phone="13800000004")
+        db.add(extra_student)
+        db.flush()
+
+        rows = [
+            Enrollment(
+                student_id=extra_student.id,
+                grade="新高二暑",
+                class_subjects=["英才物理", "英才化学"],
+                class_mode="线上",
+                mode_details=None,
+                base_price=2000,
+                discount_total=0,
+                final_price=2000,
+                discount_info={},
+                non_price_benefits={"notes": []},
+                pricing_formula="base",
+                pricing_snapshot={"version": 1},
+                quote_valid_until=_utcnow_naive(),
+                quote_fingerprint="fp-4",
+                status="increased",
+                valid=True,
+                operator_name="测试",
+                source="测试",
+                chain_root_enrollment_id=None,
+                previous_enrollment_id=None,
+            ),
+            Enrollment(
+                student_id=extra_student.id,
+                grade="新高三暑",
+                class_subjects=["英才化学"],
+                class_mode="混合",
+                mode_details={"offline_subjects": [], "online_subjects": ["英才化学"]},
+                base_price=1500,
+                discount_total=0,
+                final_price=1500,
+                discount_info={},
+                non_price_benefits={"notes": []},
+                pricing_formula="base",
+                pricing_snapshot={"version": 1},
+                quote_valid_until=_utcnow_naive(),
+                quote_fingerprint="fp-5",
+                status="partial_refunded",
+                valid=True,
+                operator_name="测试",
+                source="测试",
+                chain_root_enrollment_id=None,
+                previous_enrollment_id=None,
+            ),
+            Enrollment(
+                student_id=extra_student.id,
+                grade="新高二暑",
+                class_subjects=["英才数学"],
+                class_mode="线下",
+                mode_details=None,
+                base_price=1000,
+                discount_total=0,
+                final_price=1000,
+                discount_info={},
+                non_price_benefits={"notes": []},
+                pricing_formula="base",
+                pricing_snapshot={"version": 1},
+                quote_valid_until=_utcnow_naive(),
+                quote_fingerprint="fp-6",
+                status="refunded",
+                valid=True,
+                operator_name="测试",
+                source="测试",
+                chain_root_enrollment_id=None,
+                previous_enrollment_id=None,
+            ),
+        ]
+        db.add_all(rows)
+        db.flush()
+        for row in rows:
+            row.chain_root_enrollment_id = row.id
+        db.commit()
+
+        stats = get_enrollment_stats(db)
+        summary = stats["summary"]
+
+        assert summary["total_rows"] == 3
+        assert summary["total_enrollment_subject_units"] == 4
+        assert summary["total_offline"] == 1
+        assert summary["total_online"] == 3
+
+        by_key = {(item["grade"], item["subject"]): item for item in stats["rows"]}
+
+        physics = by_key[("新高二暑", "英才物理")]
+        assert physics["offline_count"] == 1
+        assert physics["online_count"] == 1
+        assert physics["total_count"] == 2
+
+        chemistry_g2 = by_key[("新高二暑", "英才化学")]
+        assert chemistry_g2["offline_count"] == 0
+        assert chemistry_g2["online_count"] == 1
+        assert chemistry_g2["total_count"] == 1
+
+        chemistry_g3 = by_key[("新高三暑", "英才化学")]
+        assert chemistry_g3["offline_count"] == 0
+        assert chemistry_g3["online_count"] == 1
+        assert chemistry_g3["total_count"] == 1
+
+        assert ("新高二暑", "英才数学") not in by_key
     finally:
         db.close()
