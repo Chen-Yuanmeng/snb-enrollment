@@ -316,6 +316,8 @@ async function loadEnrollments() {
 
     enrollmentList.innerHTML = rows
       .map((item) => {
+        const isAdjustmentGenerated = Number(item.previous_enrollment_id || 0) > 0;
+        const canPay = item.status === "unconfirmed" && !isAdjustmentGenerated;
         const subjects = Array.isArray(item.class_subjects) ? item.class_subjects.join("、") : "-";
         const payable = formatMoney(item.final_price);
         const adjustmentTag = item.adjustment_tag ? `<span class='source-pill'>${item.adjustment_tag}</span>` : "";
@@ -334,6 +336,11 @@ async function loadEnrollments() {
               <div class='enrollment-meta'>报价时间: ${formatDateTime(item.created_at)}</div>
               <div class='enrollment-meta'>报价信息: ${renderQuoteInfo(item)}</div>
             </div>
+            ${
+              canPay
+                ? `<div class='actions'><button type='button' data-pay-id='${item.id}'>确认报名</button></div>`
+                : ""
+            }
           </div>
         `;
       })
@@ -370,6 +377,16 @@ statusFilter.addEventListener("change", async () => {
   enrollmentState.page = 1;
   await loadEnrollments();
 });
+enrollmentList.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  const button = target.closest("button[data-pay-id]");
+  if (!button) return;
+  const id = Number(button.getAttribute("data-pay-id"));
+  if (!Number.isFinite(id)) return;
+  await payEnrollment(id);
+});
+
 enrollmentPagination?.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
