@@ -233,9 +233,12 @@ async function loadSources() {
 }
 
 function statusText(status) {
-  if (status === "quoted") return "已报价";
-  if (status === "paid") return "已缴费";
-  if (status === "refund_requested") return "退费申请中";
+  if (status === "unconfirmed") return "未确认";
+  if (status === "confirmed") return "已确认";
+  if (status === "pending_adjustment") return "待调整";
+  if (status === "adjusted") return "已调整";
+  if (status === "increased") return "已增报";
+  if (status === "partial_refunded") return "已部分退费";
   if (status === "refunded") return "已退费";
   return status || "-";
 }

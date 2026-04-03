@@ -379,6 +379,11 @@ button.secondary {
   color: var(--ok);
 }
 
+.status-refunded {
+  background: #fbe4e6;
+  color: #b13a44;
+}
+
 .list-row {
   border-bottom: 1px dashed var(--line);
   padding: 7px 0;

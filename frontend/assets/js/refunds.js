@@ -600,7 +600,7 @@ function renderAdjustmentSummary(data) {
   ].join("\n");
 }
 
-async function searchPaidEnrollments() {
+async function searchConfirmedEnrollments() {
   const keyword = searchKeywordInput.value.trim();
   if (!keyword) {
     alert("请输入学生姓名或报名ID");
@@ -608,14 +608,25 @@ async function searchPaidEnrollments() {
   }
 
   try {
-    const result = await fetchJson(
-      `${API_BASE}/enrollments?status=paid&keyword=${encodeURIComponent(keyword)}`
-    );
-    currentSearchRows = result.data || [];
+    const [confirmedResult, partialRefundedResult, increasedResult] = await Promise.all([
+      fetchJson(`${API_BASE}/enrollments?status=confirmed&keyword=${encodeURIComponent(keyword)}`),
+      fetchJson(`${API_BASE}/enrollments?status=partial_refunded&keyword=${encodeURIComponent(keyword)}`),
+      fetchJson(`${API_BASE}/enrollments?status=increased&keyword=${encodeURIComponent(keyword)}`),
+    ]);
+
+    const allRows = (confirmedResult.data || [])
+      .concat(partialRefundedResult.data || [])
+      .concat(increasedResult.data || []);
+    const uniqueRows = new Map();
+    allRows.forEach((item) => {
+      if (!item || !item.id) return;
+      uniqueRows.set(item.id, item);
+    });
+    currentSearchRows = [...uniqueRows.values()];
     renderSearchResults(currentSearchRows);
 
     if (currentSearchRows.length === 0) {
-      refundResult.textContent = "未搜索到已缴费报名记录";
+      refundResult.textContent = "未搜索到可调整报名记录（已确认/已部分退费/已增报）";
       return;
     }
 
@@ -706,7 +717,7 @@ window.addEventListener("beforeunload", (event) => {
   event.preventDefault();
   event.returnValue = "";
 });
-searchEnrollmentBtn.addEventListener("click", searchPaidEnrollments);
+searchEnrollmentBtn.addEventListener("click", searchConfirmedEnrollments);
 newGradeSelect.addEventListener("change", renderGradeRule);
 newClassModeSelect.addEventListener("change", refreshMixedModeRows);
 searchHistoryBtn.addEventListener("click", searchHistory);

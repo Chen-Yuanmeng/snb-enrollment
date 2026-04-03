@@ -342,7 +342,7 @@ async function evaluateWuyiEligibility(conf, studentName, studentPhone) {
     return { eligible: false, caseInput: 0 };
   }
 
-  const statuses = ["paid", "refund_requested", "refunded"];
+  const statuses = ["confirmed", "pending_adjustment", "adjusted", "increased", "partial_refunded", "refunded"];
   const enrollmentLists = await Promise.all(
     statuses.map(async (status) => {
       const query = new URLSearchParams({
@@ -915,7 +915,7 @@ quoteForm.addEventListener("submit", async (event) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      quoteResult.textContent = `${text}\n\n已自动保存为已报价单，报名ID: ${saveResult.data.enrollment_id}`;
+      quoteResult.textContent = `${text}\n\n已自动生成报名记录，报名ID: ${saveResult.data.enrollment_id}`;
     } catch (saveError) {
       quoteResult.textContent = `${text}\n\n报价已复制，但自动保存失败: ${saveError.message}`;
     }

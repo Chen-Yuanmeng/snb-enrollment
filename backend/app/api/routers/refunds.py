@@ -5,7 +5,13 @@ from app.config import config
 from app.core.validation import ensure_operator, ensure_source
 from app.database import get_db
 from app.services import refund_service
-from app.schemas import ApiResponse, RefundCreateRequest, RefundPreviewRequest
+from app.schemas import (
+    AdjustmentConfirmPaymentRequest,
+    ApiResponse,
+    RefundConfirmRequest,
+    RefundCreateRequest,
+    RefundPreviewRequest,
+)
 
 router = APIRouter()
 
@@ -22,3 +28,27 @@ def create_refund(payload: RefundCreateRequest, db: Session = Depends(get_db)) -
     ensure_operator(payload.operator_name)
     ensure_source(payload.source)
     return ApiResponse(data=refund_service.create_refund(db, payload))
+
+
+@router.get(f"{config.api_prefix}/refunds/adjustments/pending", response_model=ApiResponse)
+def list_pending_adjustments(keyword: str | None = None, db: Session = Depends(get_db)) -> ApiResponse:
+    result = refund_service.list_pending_adjustments(db, keyword=keyword)
+    return ApiResponse(data=result["items"], total=result["total"])
+
+
+@router.post(f"{config.api_prefix}/refunds/adjustments/{{enrollment_id}}/confirm-payment", response_model=ApiResponse)
+def confirm_adjustment_payment(
+    enrollment_id: int,
+    payload: AdjustmentConfirmPaymentRequest,
+    db: Session = Depends(get_db),
+) -> ApiResponse:
+    ensure_operator(payload.operator_name)
+    ensure_source(payload.source)
+    return ApiResponse(data=refund_service.confirm_adjustment_payment(db, enrollment_id, payload))
+
+
+@router.post(f"{config.api_prefix}/refunds/{{refund_id}}/confirm", response_model=ApiResponse)
+def confirm_refund(refund_id: int, payload: RefundConfirmRequest, db: Session = Depends(get_db)) -> ApiResponse:
+    ensure_operator(payload.operator_name)
+    ensure_source(payload.source)
+    return ApiResponse(data=refund_service.confirm_refund(db, refund_id, payload))

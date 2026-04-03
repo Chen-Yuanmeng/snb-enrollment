@@ -96,16 +96,21 @@ async function fetchJson(url, options = {}) {
 }
 
 function statusText(status) {
-  if (status === "quoted") return "已报价";
-  if (status === "paid") return "已缴费";
-  if (status === "refund_requested") return "退费申请中";
+  if (status === "unconfirmed") return "未确认";
+  if (status === "confirmed") return "已确认";
+  if (status === "pending_adjustment") return "待调整";
+  if (status === "adjusted") return "已调整";
+  if (status === "increased") return "已增报";
+  if (status === "partial_refunded") return "已部分退费";
   if (status === "refunded") return "已退费";
   return status;
 }
 
 function statusClass(status) {
-  if (status === "quoted") return "status-quoted";
-  if (status === "paid") return "status-paid";
+  if (status === "unconfirmed" || status === "pending_adjustment") return "status-quoted";
+  if (status === "confirmed" || status === "adjusted" || status === "increased") return "status-paid";
+  if (status === "partial_refunded") return "status-paid";
+  if (status === "refunded") return "status-refunded";
   return "";
 }
 
@@ -193,12 +198,12 @@ async function payEnrollment(id) {
       body: JSON.stringify({
         operator_name: operatorSelect.value,
         source: sourceSelect.value,
-        note: "前端报价管理页面确认缴费",
+        note: "前端报名管理页面确认报名",
       }),
     });
     await loadEnrollments();
   } catch (error) {
-    alert(`确认缴费失败: ${error.message}`);
+    alert(`确认报名失败: ${error.message}`);
   }
 }
 
@@ -290,6 +295,7 @@ async function loadEnrollments() {
     const query = new URLSearchParams();
     query.append("page", String(enrollmentState.page));
     query.append("page_size", String(enrollmentState.pageSize));
+    query.append("latest_only", "true");
     if (statusFilter.value) query.append("status", statusFilter.value);
     if (gradeFilter.value) query.append("grade", gradeFilter.value);
     const studentName = studentNameFilter?.value.trim() || "";
@@ -310,15 +316,17 @@ async function loadEnrollments() {
 
     enrollmentList.innerHTML = rows
       .map((item) => {
-        const canPay = item.status === "quoted";
         const subjects = Array.isArray(item.class_subjects) ? item.class_subjects.join("、") : "-";
         const payable = formatMoney(item.final_price);
+        const adjustmentTag = item.adjustment_tag ? `<span class='source-pill'>${item.adjustment_tag}</span>` : "";
         return `
           <div class='list-row'>
             <div>
               <div class='enrollment-title-line'>
                 <strong>#${item.id} ${item.student_name || "-"}</strong>
                 <span class='grade-pill'>${item.grade || "-"}</span>
+                <span class='status-pill ${statusClass(item.status)}'>${statusText(item.status)}</span>
+                ${adjustmentTag}
                 <span class='amount-pill'>应缴 ${payable}</span>
                 <span class='source-pill'>${item.source || "-"}</span>
               </div>
@@ -326,11 +334,6 @@ async function loadEnrollments() {
               <div class='enrollment-meta'>报价时间: ${formatDateTime(item.created_at)}</div>
               <div class='enrollment-meta'>报价信息: ${renderQuoteInfo(item)}</div>
             </div>
-            ${
-              canPay
-                ? `<div class='actions'><button type='button' data-pay-id='${item.id}'>确认缴费</button></div>`
-                : ""
-            }
           </div>
         `;
       })
@@ -366,15 +369,6 @@ gradeFilter.addEventListener("change", async () => {
 statusFilter.addEventListener("change", async () => {
   enrollmentState.page = 1;
   await loadEnrollments();
-});
-enrollmentList.addEventListener("click", async (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLElement)) return;
-  const button = target.closest("button[data-pay-id]");
-  if (!button) return;
-  const id = Number(button.getAttribute("data-pay-id"));
-  if (!Number.isFinite(id)) return;
-  await payEnrollment(id);
 });
 enrollmentPagination?.addEventListener("click", async (event) => {
   const target = event.target;

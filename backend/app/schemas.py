@@ -161,6 +161,18 @@ class RefundCreateRequest(BaseModel):
     review_note: str | None = None
 
 
+class AdjustmentConfirmPaymentRequest(BaseModel):
+    operator_name: str = Field(min_length=1, max_length=50)
+    source: str = Field(min_length=1, max_length=50)
+    note: str | None = None
+
+
+class RefundConfirmRequest(BaseModel):
+    operator_name: str = Field(min_length=1, max_length=50)
+    source: str = Field(min_length=1, max_length=50)
+    note: str | None = None
+
+
 class EnrollmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -175,6 +187,7 @@ class EnrollmentOut(BaseModel):
     quote_valid_until: datetime
     operator_name: str
     created_at: datetime
+    note: str | None = None
 
 
 class StudentHistoryCreateRequest(BaseModel):

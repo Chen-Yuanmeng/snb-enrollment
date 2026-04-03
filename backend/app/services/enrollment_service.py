@@ -4,13 +4,31 @@ from fastapi import HTTPException
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.constants import STATUS_PAID, STATUS_QUOTED
+from app.constants import STATUS_CONFIRMED, STATUS_REFUNDED, STATUS_UNCONFIRMED
 from app.core.datetime_utils import utcnow_naive
 from app.errors import raise_biz_error
 from app.models import Enrollment, Student
 from app.pricing_engine import build_fingerprint, build_quote
 from app.schemas import BatchPayRequest, EnrollmentCreateRequest, EnrollmentOut, PayRequest
+from app.services import notification_service
 from app.services.shared_service import get_or_create_student, inject_auto_discounts, log_operation
+
+
+def _render_payment_notice(enrollment: Enrollment, student: Student | None) -> str:
+    return "\n".join(
+        [
+            "【报名交费通知】",
+            f"报名ID: {enrollment.id}",
+            f"学生: {student.name if student and student.name else '-'}",
+            f"手机号: {student.phone if student and student.phone else '-'}",
+            f"年级: {enrollment.grade}",
+            f"科目: {'、'.join(enrollment.class_subjects or []) or '-'}",
+            f"实收金额: ¥{float(enrollment.final_price):.2f}",
+            f"算式: {enrollment.pricing_formula}",
+            f"来源: {enrollment.source or '-'}",
+            "状态: 已确认",
+        ]
+    )
 
 
 def create_enrollment(db: Session, payload: EnrollmentCreateRequest) -> dict[str, Any]:
@@ -46,7 +64,7 @@ def create_enrollment(db: Session, payload: EnrollmentCreateRequest) -> dict[str
             pricing_snapshot=quote.pricing_snapshot,
             quote_valid_until=quote.quote_valid_until,
             quote_fingerprint=fingerprint,
-            status=STATUS_QUOTED,
+            status=STATUS_UNCONFIRMED,
             valid=True,
             operator_name=effective_payload.operator_name,
             source=effective_payload.source,
@@ -54,6 +72,7 @@ def create_enrollment(db: Session, payload: EnrollmentCreateRequest) -> dict[str
         )
         db.add(row)
         db.flush()
+        row.chain_root_enrollment_id = row.id
 
         log_operation(
             db,
@@ -96,6 +115,7 @@ def list_enrollments(
     page: int = 1,
     page_size: int = 20,
     limit: int | None = None,
+    latest_only: bool = True,
 ) -> dict[str, Any]:
     normalized_page = page if isinstance(page, int) else 1
     normalized_page_size = page_size if isinstance(page_size, int) else 20
@@ -128,6 +148,10 @@ def list_enrollments(
             else:
                 filters.append(Student.name.ilike(f"%{trimmed}%"))
 
+    if latest_only:
+        latest_hidden_ids_stmt = select(Enrollment.previous_enrollment_id).where(Enrollment.previous_enrollment_id.is_not(None))
+        filters.append(~Enrollment.id.in_(latest_hidden_ids_stmt))
+
     if filters:
         data_stmt = data_stmt.where(*filters)
         count_stmt = count_stmt.where(*filters)
@@ -149,6 +173,15 @@ def list_enrollments(
         item["pricing_snapshot"] = enrollment.pricing_snapshot or {}
         item["base_price"] = float(enrollment.base_price)
         item["discount_total"] = float(enrollment.discount_total)
+        item["chain_root_enrollment_id"] = enrollment.chain_root_enrollment_id
+        item["previous_enrollment_id"] = enrollment.previous_enrollment_id
+        item["adjustment_tag"] = (
+            "已退费"
+            if enrollment.previous_enrollment_id is not None and enrollment.status == STATUS_REFUNDED
+            else "已调整"
+            if enrollment.previous_enrollment_id is not None
+            else ""
+        )
         data.append(item)
 
     return {
@@ -190,10 +223,10 @@ def pay_enrollment(db: Session, enrollment_id: int, payload: PayRequest) -> dict
     if row is None:
         raise_biz_error(40401, "记录不存在", status_code=404)
     row = cast(Enrollment, row)
-    if row.status != STATUS_QUOTED:
+    if row.status not in {STATUS_UNCONFIRMED, "quoted"}:
         raise_biz_error(40005, "状态流转非法")
 
-    row.status = STATUS_PAID
+    row.status = STATUS_CONFIRMED
     row.updated_at = utcnow_naive()
     row.note = payload.note or row.note
 
@@ -207,23 +240,37 @@ def pay_enrollment(db: Session, enrollment_id: int, payload: PayRequest) -> dict
         result_status="success",
     )
     db.commit()
+
+    student = db.get(Student, row.student_id)
+    try:
+        notification_service.enqueue_typed_text(
+            db=db,
+            message_type="payment",
+            text=_render_payment_notice(row, student),
+        )
+    except Exception:
+        # 通知链路异常不影响交费主流程。
+        pass
+
     return {"enrollment_id": row.id, "status": row.status}
 
 
 def pay_batch(db: Session, payload: BatchPayRequest) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
+    paid_ids: list[int] = []
 
     for enrollment_id in payload.enrollment_ids:
         row = db.get(Enrollment, enrollment_id)
         if not row:
             results.append({"enrollment_id": enrollment_id, "ok": False, "reason": "not found"})
             continue
-        if row.status != STATUS_QUOTED:
+        if row.status not in {STATUS_UNCONFIRMED, "quoted"}:
             results.append({"enrollment_id": enrollment_id, "ok": False, "reason": "invalid status"})
             continue
-        row.status = STATUS_PAID
+        row.status = STATUS_CONFIRMED
         row.updated_at = utcnow_naive()
         results.append({"enrollment_id": enrollment_id, "ok": True})
+        paid_ids.append(row.id)
 
         log_operation(
             db,
@@ -236,4 +283,20 @@ def pay_batch(db: Session, payload: BatchPayRequest) -> list[dict[str, Any]]:
         )
 
     db.commit()
+
+    for enrollment_id in paid_ids:
+        paid = db.get(Enrollment, enrollment_id)
+        if not paid:
+            continue
+        student = db.get(Student, paid.student_id)
+        try:
+            notification_service.enqueue_typed_text(
+                db=db,
+                message_type="payment",
+                text=_render_payment_notice(paid, student),
+            )
+        except Exception:
+            # 通知链路异常不影响批量交费主流程。
+            pass
+
     return results

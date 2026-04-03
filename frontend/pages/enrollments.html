@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>已生成报价管理</title>
+    <title>报名管理</title>
     <link rel="stylesheet" href="../assets/css/styles.css?v=20260331c" />
   </head>
   <body>
     <header class="topbar">
       <div class="topbar-main">
-        <h1>已生成报价管理</h1>
+        <h1>报名管理</h1>
         <nav class="topbar-links">
           <a href="../index.html" target="_blank" rel="noopener noreferrer">返回主页</a>
           <a href="./accommodations.html" target="_blank" rel="noopener noreferrer">住宿报名</a>
@@ -48,8 +48,13 @@
             状态
             <select id="statusFilter">
               <option value="">全部</option>
-              <option value="quoted">已报价</option>
-              <option value="paid">已缴费</option>
+              <option value="unconfirmed">未确认</option>
+              <option value="confirmed">已确认</option>
+              <option value="pending_adjustment">待调整</option>
+              <option value="adjusted">已调整</option>
+              <option value="increased">已增报</option>
+              <option value="partial_refunded">已部分退费</option>
+              <option value="refunded">已退费</option>
             </select>
           </label>
         </div>
@@ -65,6 +70,6 @@
       </section>
     </main>
 
-    <script src="../assets/js/enrollments.js?v=20260331c"></script>
+    <script src="../assets/js/enrollments.js?v=20260403b"></script>
   </body>
 </html>

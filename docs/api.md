@@ -121,9 +121,10 @@
 - 返回：enrollment_id, status
 
 ### GET /enrollments
-- 参数（可选）：status, student_id, grade, valid, source, keyword, page（默认1）, page_size（默认20，最大200）, limit（兼容旧参数，传入后按第一页+limit返回）
+- 参数（可选）：status, student_id, grade, valid, source, keyword, page（默认1）, page_size（默认20，最大200）, limit（兼容旧参数，传入后按第一页+limit返回）, latest_only（默认 true）
 - keyword 支持：学生姓名模糊匹配；纯数字时按报名ID精确匹配
-- 返回：`data` 为报名列表（含 class_subjects, source, student_name, student_phone），并在顶层返回分页元数据：`total`, `page`, `page_size`
+- 返回：`data` 为报名列表（含 class_subjects, source, student_name, student_phone, chain_root_enrollment_id, previous_enrollment_id, adjustment_tag），并在顶层返回分页元数据：`total`, `page`, `page_size`
+- 默认仅返回每条报名链最新节点（`latest_only=true`），用于“报名管理”页避免展示已被后续调整替代的旧记录
 
 ### GET /enrollments/{enrollment_id}
 - 返回：单条详情（含 class_subjects, source, 算式、快照、优惠明细）
@@ -131,8 +132,8 @@
 ## 4. 缴费
 ### POST /enrollments/{enrollment_id}/pay
 - 入参：operator_name, source, note（可选）
-- 前置：状态必须是 quoted
-- 处理：状态改为 paid，写日志
+- 前置：状态必须是 unconfirmed（兼容历史 quoted）
+- 处理：状态改为 confirmed，写日志
 
 ### POST /enrollments/pay-batch
 - 入参：operator_name, source, enrollment_ids[]
@@ -157,10 +158,24 @@
 ### POST /refunds
 - 入参与 preview 一致，增加 review_note
 - 处理：
-  - 金额增加（increase）：创建一条新报名记录（status=quoted，待确认缴费），返回补交金额
-  - 金额减少（decrease）：创建退费记录，原报名置为 refund_requested，返回退费提示
-  - 金额不变（equal）：不创建新报名或退费记录，仅生成通知文案
+  - 统一先将原报名置为 pending_adjustment，再生成一条新报名记录（status=unconfirmed，指向同一报名链）
+  - 金额增加（increase）：生成调整任务（pending），确认后新报名=confirmed，原报名=adjusted
+  - 金额减少（decrease）：生成退费任务（pending），确认后新报名=refunded，原报名=refunded
+  - 金额不变（equal）：仍生成调整任务（pending），确认后新报名=confirmed，原报名=adjusted
   - 统一返回：branch_type、old_price、new_price、delta_amount、payable_amount、refundable_amount、related_ids、notice_text
+
+### GET /refunds/adjustments/pending
+- 说明：查询报名调整管理列表（名称沿用历史路径，当前返回全部调整记录）
+- 参数（可选）：keyword（姓名/报名ID/退费ID）
+- 返回：包含所有调整记录（未调整与已调整，含 increase/decrease/equal）
+
+### POST /refunds/adjustments/{enrollment_id}/confirm-payment
+- 说明：确认补交或金额不变调整
+- 入参：operator_name, source, note（可选）
+
+### POST /refunds/{refund_id}/confirm
+- 说明：确认退费调整
+- 入参：operator_name, source, note（可选）
 
 ## 6. 日志
 ### GET /logs
@@ -208,8 +223,9 @@
 - 参数（可选）：keyword, page, page_size, limit
 
 ## 状态流转
-- quoted -> paid
-- paid -> refund_requested -> refunded
+- unconfirmed -> confirmed
+- confirmed -> pending_adjustment -> adjusted
+- pending_adjustment/adjusted -> refunded（退费确认分支）
 
 ## 关键校验
 - `operator_name` 必填且必须在配置名单中

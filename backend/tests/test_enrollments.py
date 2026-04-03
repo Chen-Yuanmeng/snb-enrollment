@@ -44,10 +44,12 @@ def _seed_enrollments(db):
             pricing_snapshot={"version": 1},
             quote_valid_until=_utcnow_naive(),
             quote_fingerprint="fp-1",
-            status="quoted",
+            status="unconfirmed",
             valid=True,
             operator_name="测试",
             source="测试",
+            chain_root_enrollment_id=None,
+            previous_enrollment_id=None,
         ),
         Enrollment(
             student_id=students[1].id,
@@ -64,10 +66,12 @@ def _seed_enrollments(db):
             pricing_snapshot={"version": 1},
             quote_valid_until=_utcnow_naive(),
             quote_fingerprint="fp-2",
-            status="paid",
+            status="confirmed",
             valid=True,
             operator_name="测试",
             source="测试",
+            chain_root_enrollment_id=None,
+            previous_enrollment_id=None,
         ),
         Enrollment(
             student_id=students[2].id,
@@ -84,13 +88,18 @@ def _seed_enrollments(db):
             pricing_snapshot={"version": 1},
             quote_valid_until=_utcnow_naive(),
             quote_fingerprint="fp-3",
-            status="quoted",
+            status="unconfirmed",
             valid=True,
             operator_name="测试",
             source="测试",
+            chain_root_enrollment_id=None,
+            previous_enrollment_id=None,
         ),
     ]
     db.add_all(enrollments)
+    db.flush()
+    for row in enrollments:
+        row.chain_root_enrollment_id = row.id
     db.commit()
 
 
@@ -117,7 +126,7 @@ def test_enrollments_filter_and_limit_compatibility():
     db = _make_session()
     try:
         _seed_enrollments(db)
-        result = list_enrollments(status="quoted", page=1, page_size=20, db=db)
+        result = list_enrollments(status="unconfirmed", page=1, page_size=20, db=db)
         assert result.total == 2
         assert len(result.data) == 2
 
@@ -130,5 +139,50 @@ def test_enrollments_filter_and_limit_compatibility():
         assert compat.page == 1
         assert compat.page_size == 2
         assert len(compat.data) == 2
+    finally:
+        db.close()
+
+
+def test_enrollments_default_to_latest_chain_node_only():
+    db = _make_session()
+    try:
+        _seed_enrollments(db)
+        old = db.query(Enrollment).filter(Enrollment.student_id == 1).first()
+        assert old is not None
+        old.status = "pending_adjustment"
+
+        new_row = Enrollment(
+            student_id=old.student_id,
+            grade=old.grade,
+            class_subjects=old.class_subjects,
+            class_mode=old.class_mode,
+            mode_details=old.mode_details,
+            base_price=old.base_price,
+            discount_total=old.discount_total,
+            final_price=old.final_price,
+            discount_info=old.discount_info,
+            non_price_benefits=old.non_price_benefits,
+            pricing_formula=old.pricing_formula,
+            pricing_snapshot=old.pricing_snapshot,
+            quote_valid_until=old.quote_valid_until,
+            quote_fingerprint="fp-new",
+            status="unconfirmed",
+            valid=True,
+            operator_name="测试",
+            source="测试",
+            chain_root_enrollment_id=old.chain_root_enrollment_id,
+            previous_enrollment_id=old.id,
+        )
+        db.add(new_row)
+        db.commit()
+
+        latest = list_enrollments(page=1, page_size=20, db=db)
+        assert all(item["id"] != old.id for item in latest.data)
+        assert any(item["id"] == new_row.id for item in latest.data)
+
+        with_history = list_enrollments(page=1, page_size=20, latest_only=False, db=db)
+        ids = [item["id"] for item in with_history.data]
+        assert old.id in ids
+        assert new_row.id in ids
     finally:
         db.close()

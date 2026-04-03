@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS enrollments (
     valid BOOLEAN NOT NULL DEFAULT TRUE,
     operator_name VARCHAR(50) NOT NULL,
     source VARCHAR(50) NOT NULL,
+    chain_root_enrollment_id BIGINT NULL REFERENCES enrollments(id),
+    previous_enrollment_id BIGINT NULL REFERENCES enrollments(id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     note TEXT NULL
@@ -59,6 +61,8 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_valid ON enrollments(valid);
 CREATE INDEX IF NOT EXISTS idx_enrollments_quote_valid_until ON enrollments(quote_valid_until);
 CREATE INDEX IF NOT EXISTS idx_enrollments_fingerprint ON enrollments(quote_fingerprint);
 CREATE INDEX IF NOT EXISTS idx_enrollments_source ON enrollments(source);
+CREATE INDEX IF NOT EXISTS idx_enrollments_chain_root ON enrollments(chain_root_enrollment_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_previous ON enrollments(previous_enrollment_id);
 
 CREATE TABLE IF NOT EXISTS accommodation_enrollments (
     id BIGSERIAL PRIMARY KEY,
@@ -103,12 +107,17 @@ CREATE TABLE IF NOT EXISTS refunds (
     review_note TEXT NULL,
     operator_name VARCHAR(50) NOT NULL,
     source VARCHAR(50) NOT NULL,
+    task_type VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    confirmed_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     note TEXT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_refunds_original_enrollment ON refunds(original_enrollment_id);
 CREATE INDEX IF NOT EXISTS idx_refunds_created_at ON refunds(created_at);
+CREATE INDEX IF NOT EXISTS idx_refunds_status ON refunds(status);
+CREATE INDEX IF NOT EXISTS idx_refunds_task_type ON refunds(task_type);
 
 CREATE TABLE IF NOT EXISTS operation_logs (
     id BIGSERIAL PRIMARY KEY,

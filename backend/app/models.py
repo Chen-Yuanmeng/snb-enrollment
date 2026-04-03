@@ -62,6 +62,12 @@ class Enrollment(Base):
     valid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     operator_name: Mapped[str] = mapped_column(String(50), nullable=False)
     source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    chain_root_enrollment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("enrollments.id"), nullable=True, index=True
+    )
+    previous_enrollment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("enrollments.id"), nullable=True, index=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     updated_at: Mapped[datetime] = mapped_column(
@@ -95,6 +101,9 @@ class Refund(Base):
 
     operator_name: Mapped[str] = mapped_column(String(50), nullable=False)
     source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    task_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

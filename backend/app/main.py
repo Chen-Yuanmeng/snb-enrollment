@@ -11,7 +11,7 @@ from .api import api_router
 from .api.routers.enrollments import list_enrollments
 from .api.routers.students_history import list_students_history
 from .config import config
-from .database import Base, engine
+from .database import Base, engine, ensure_runtime_schema_compatibility
 
 
 @asynccontextmanager
@@ -23,6 +23,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             )
         Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    ensure_runtime_schema_compatibility()
     yield
 
 

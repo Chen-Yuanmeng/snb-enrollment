@@ -29,6 +29,7 @@ def list_enrollments(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     limit: int | None = Query(None, ge=1, le=200),
+    latest_only: bool = True,
     db: Session = Depends(get_db),
 ) -> ApiResponse:
     result = enrollment_service.list_enrollments(
@@ -42,6 +43,7 @@ def list_enrollments(
         page=page,
         page_size=page_size,
         limit=limit,
+        latest_only=latest_only,
     )
     return ApiResponse(**result)
 

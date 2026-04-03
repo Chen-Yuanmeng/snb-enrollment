@@ -107,6 +107,7 @@ function statusText(status) {
   if (status === "generated") return "已生成";
   if (status === "confirmed") return "已确认";
   if (status === "cancelled") return "已取消";
+  if (status === "partial_refunded") return "已部分退费";
   return status || "-";
 }
 

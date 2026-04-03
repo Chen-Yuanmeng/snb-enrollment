@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>住宿报价确认</title>
-    <link rel="stylesheet" href="../assets/css/styles.css?v=20260331c" />
+    <title>报名调整管理</title>
+    <link rel="stylesheet" href="../assets/css/styles.css?v=20260402a" />
   </head>
   <body>
     <header class="topbar">
       <div class="topbar-main">
-        <h1>住宿报价确认</h1>
+        <h1>报名调整管理</h1>
         <nav class="topbar-links">
           <a href="../index.html" target="_blank" rel="noopener noreferrer">返回主页</a>
           <a href="./enrollments.html" target="_blank" rel="noopener noreferrer">报名管理</a>
-          <a href="./accommodations.html" target="_blank" rel="noopener noreferrer">住宿报名</a>
           <a href="./refunds.html" target="_blank" rel="noopener noreferrer">报名调整</a>
+          <a href="./accommodations.html" target="_blank" rel="noopener noreferrer">住宿报名</a>
           <a href="./old-students.html" target="_blank" rel="noopener noreferrer">老生管理</a>
         </nav>
       </div>
@@ -32,25 +32,26 @@
 
     <main class="layout">
       <section class="card">
-        <h2>筛选条件 <a href="./accommodation-stats.html" target="_blank" style="margin-left: 10px;">查看住宿统计</a></h2>
+        <h2>筛选条件</h2>
         <div class="field-grid three-col">
           <label>
             关键词
-            <input id="keywordFilter" type="text" placeholder="学生姓名/住宿单ID/课程报价单ID" />
+            <input id="keyword" type="text" placeholder="姓名/报名ID/退费ID" />
           </label>
           <label>
-            状态
-            <select id="statusFilter">
-              <option value="" selected>全部</option>
-              <option value="generated">已生成</option>
-              <option value="confirmed">已确认</option>
-              <option value="cancelled">已取消</option>
+            类型
+            <select id="taskType">
+              <option value="">全部</option>
+              <option value="increase">待补交确认</option>
+              <option value="decrease">待退费确认</option>
             </select>
           </label>
           <label>
-            酒店
-            <select id="hotelFilter">
-              <option value="">全部酒店</option>
+            状态
+            <select id="taskStatus">
+              <option value="">全部</option>
+              <option value="pending">未调整</option>
+              <option value="confirmed">已调整</option>
             </select>
           </label>
         </div>
@@ -60,12 +61,12 @@
       </section>
 
       <section class="card">
-        <h2>住宿报价列表</h2>
-        <div id="accommodationPagination" class="pagination"></div>
-        <div id="accommodationList">加载中...</div>
+        <h2>调整记录列表</h2>
+        <div id="taskSummary" class="enrollment-meta">加载中...</div>
+        <div id="taskList">加载中...</div>
       </section>
     </main>
 
-    <script src="../assets/js/accommodation-management.js?v=20260403a"></script>
+    <script src="../assets/js/adjustment-management.js?v=20260402b"></script>
   </body>
 </html>
