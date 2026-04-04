@@ -39,6 +39,24 @@ def ensure_runtime_schema_compatibility() -> None:
                 )
             )
 
+        if "students_history" in table_names:
+            history_columns = {col["name"] for col in inspector.get_columns("students_history")}
+            if "can_renew_discount" not in history_columns:
+                conn.execute(text("ALTER TABLE students_history ADD COLUMN can_renew_discount BOOLEAN"))
+                conn.execute(
+                    text(
+                        "UPDATE students_history "
+                        "SET can_renew_discount = FALSE "
+                        "WHERE can_renew_discount IS NULL"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "ALTER TABLE students_history "
+                        "ALTER COLUMN can_renew_discount SET NOT NULL"
+                    )
+                )
+
         if "refunds" in table_names:
             refund_columns = {col["name"] for col in inspector.get_columns("refunds")}
             if "task_type" not in refund_columns:

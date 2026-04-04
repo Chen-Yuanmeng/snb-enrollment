@@ -65,7 +65,7 @@
 ### GET /students-history/search/renewal
 - 说明：老生续报搜索
 - 参数：name（必填）, grade（必填）
-- 匹配规则：name 精确匹配；grade 按等价年级集合精确匹配（例如“新高一暑/五一中考/道法押题/2029届”互认）
+- 匹配规则：name 精确匹配；grade 按等价年级集合精确匹配（例如“新高一暑/五一中考/道法押题/2029届”互认）；且仅返回 `can_renew_discount=true` 的老生
 - 返回：老生候选列表（id, name, grade, phone_suffix）
 
 ### GET /students-history/search/referral
@@ -78,18 +78,27 @@
 - 说明：老生管理列表查询（支持关键词）
 - 参数（可选）：keyword, grade, page（默认1）, page_size（默认20，最大200）, limit（兼容旧参数，传入后按第一页+limit返回）
 - 关键词支持匹配：name / grade / phone_suffix
-- 返回：`data` 为老生记录列表（id, name, grade, phone_suffix, note, created_at），并在顶层返回分页元数据：`total`, `page`, `page_size`
+- 返回：`data` 为老生记录列表（id, name, grade, phone_suffix, can_renew_discount, note, created_at），并在顶层返回分页元数据：`total`, `page`, `page_size`
 
 ### POST /students-history
 - 说明：手动新增老生记录
 - 入参：
-  - operator_name
-  - source
-  - name（必填）
-  - grade（可选）
-  - phone_suffix（可选，最多20位）
-  - note（可选）
+  - `operator_name`（必填）
+  - `source`（必填）
+  - `name`（必填）
+  - `grade`（可选）
+  - `phone_suffix`（可选，最多20位）
+  - `can_renew_discount`（必填，布尔值）
+  - `note`（可选）
 - 返回：新增后的老生记录
+
+### 批量导入老生（PostgreSQL）
+- 示例命令：
+  - `psql "$DATABASE_URL" -c "\copy students_history(name,grade,phone_suffix,note,can_renew_discount) FROM '/path/to/students_history_import.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')"`
+- CSV 文件格式（首行表头）：
+  - `name,grade,phone_suffix,note,can_renew_discount`
+- 布尔字段要求：
+  - `can_renew_discount` 每行必须显式填写 `true` 或 `false`。
 
 ## 3. 报价与报名
 ### POST /quotes/calculate

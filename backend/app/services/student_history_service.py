@@ -22,6 +22,7 @@ def search_for_renewal(db: Session, name: str, grade: str) -> list[dict[str, Any
         .where(
             StudentHistory.name == trimmed_name,
             StudentHistory.grade.in_(grade_candidates),
+            StudentHistory.can_renew_discount.is_(True),
         )
         .order_by(desc(StudentHistory.id))
         .limit(30)
@@ -122,6 +123,7 @@ def create_student_history(db: Session, payload: StudentHistoryCreateRequest) ->
         name=payload.name,
         grade=payload.grade,
         phone_suffix=payload.phone_suffix,
+        can_renew_discount=payload.can_renew_discount,
         note=payload.note,
     )
     db.add(row)
@@ -139,6 +141,7 @@ def create_student_history(db: Session, payload: StudentHistoryCreateRequest) ->
             "name": row.name,
             "grade": row.grade,
             "phone_suffix": row.phone_suffix,
+            "can_renew_discount": row.can_renew_discount,
         },
     )
 

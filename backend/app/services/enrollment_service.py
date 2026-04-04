@@ -1,13 +1,13 @@
 from typing import Any, cast
 
 from fastapi import HTTPException
-from sqlalchemy import desc, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import desc, exists, func, or_, select
+from sqlalchemy.orm import Session, aliased
 
 from app.constants import STATUS_PAID, STATUS_QUOTED
 from app.core.datetime_utils import utcnow_naive
 from app.errors import raise_biz_error
-from app.models import Enrollment, Student
+from app.models import Enrollment, Student, StudentHistory
 from app.pricing_engine import build_fingerprint, build_quote
 from app.schemas import BatchPayRequest, EnrollmentCreateRequest, EnrollmentOut, PayRequest
 from app.services import notification_service
@@ -29,6 +29,41 @@ def _render_payment_notice(enrollment: Enrollment, student: Student | None) -> s
             "状态: 已交费",
         ]
     )
+
+
+def _ensure_student_history_after_payment(db: Session, enrollment: Enrollment) -> None:
+    student = db.get(Student, enrollment.student_id)
+    if student is None:
+        return
+
+    student_name = (student.name or "").strip()
+    if not student_name:
+        return
+
+    grade = (enrollment.grade or "").strip() or None
+    phone_suffix = (student.phone or "").strip() or None
+    existed = db.scalar(
+        select(StudentHistory.id)
+        .where(
+            StudentHistory.name == student_name,
+            StudentHistory.grade == grade,
+            StudentHistory.phone_suffix == phone_suffix,
+        )
+        .limit(1)
+    )
+    if existed is not None:
+        return
+
+    db.add(
+        StudentHistory(
+            name=student_name,
+            grade=grade,
+            phone_suffix=phone_suffix,
+            can_renew_discount=False,
+            note="系统自动补录：确认缴费",
+        )
+    )
+    db.flush()
 
 
 def create_enrollment(db: Session, payload: EnrollmentCreateRequest) -> dict[str, Any]:
@@ -114,6 +149,7 @@ def list_enrollments(
     page: int = 1,
     page_size: int = 20,
     limit: int | None = None,
+    latest_only: bool = True,
 ) -> dict[str, Any]:
     normalized_page = page if isinstance(page, int) else 1
     normalized_page_size = page_size if isinstance(page_size, int) else 20
@@ -149,6 +185,12 @@ def list_enrollments(
     if filters:
         data_stmt = data_stmt.where(*filters)
         count_stmt = count_stmt.where(*filters)
+
+    if latest_only:
+        child = aliased(Enrollment)
+        has_newer = exists(select(1).where(child.previous_enrollment_id == Enrollment.id))
+        data_stmt = data_stmt.where(~has_newer)
+        count_stmt = count_stmt.where(~has_newer)
 
     total = int(db.scalar(count_stmt) or 0)
 
@@ -214,6 +256,7 @@ def pay_enrollment(db: Session, enrollment_id: int, payload: PayRequest) -> dict
     row.status = STATUS_PAID
     row.updated_at = utcnow_naive()
     row.note = payload.note or row.note
+    _ensure_student_history_after_payment(db, row)
 
     log_operation(
         db,
@@ -254,6 +297,7 @@ def pay_batch(db: Session, payload: BatchPayRequest) -> list[dict[str, Any]]:
             continue
         row.status = STATUS_PAID
         row.updated_at = utcnow_naive()
+        _ensure_student_history_after_payment(db, row)
         results.append({"enrollment_id": enrollment_id, "ok": True})
         paid_ids.append(row.id)
 

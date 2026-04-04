@@ -44,6 +44,7 @@ const createForm = document.querySelector("#createForm");
 const newNameInput = document.querySelector("#newName");
 const newGradeInput = document.querySelector("#newGrade");
 const newPhoneSuffixInput = document.querySelector("#newPhoneSuffix");
+const newCanRenewDiscountSelect = document.querySelector("#newCanRenewDiscount");
 const newNoteInput = document.querySelector("#newNote");
 const historyList = document.querySelector("#historyList");
 const historyPagination = document.querySelector("#historyPagination");
@@ -145,6 +146,7 @@ function renderHistoryRows(rows) {
             <strong>#${item.id}</strong> ${item.name}
             <span class='status-pill status-quoted'>${item.grade || "未填写年级"}</span><br />
             手机尾号: ${item.phone_suffix || "-"}<br />
+            老生续报优惠: ${item.can_renew_discount ? "可享受" : "不可享受"}<br />
             备注: ${item.note || "-"}<br />
             创建时间: ${createdAt}
           </div>
@@ -276,10 +278,15 @@ async function createHistory(event) {
   const name = newNameInput.value.trim();
   const grade = newGradeInput.value.trim();
   const phoneSuffix = newPhoneSuffixInput.value.trim();
+  const canRenewDiscount = newCanRenewDiscountSelect.value;
   const note = newNoteInput.value.trim();
 
   if (!name) {
     alert("老生姓名不能为空");
+    return;
+  }
+  if (canRenewDiscount !== "true" && canRenewDiscount !== "false") {
+    alert("请选择是否可享受老生续报优惠");
     return;
   }
 
@@ -293,6 +300,7 @@ async function createHistory(event) {
         name,
         grade: grade || null,
         phone_suffix: phoneSuffix || null,
+        can_renew_discount: canRenewDiscount === "true",
         note: note || null,
       }),
     });
@@ -300,6 +308,7 @@ async function createHistory(event) {
     newNameInput.value = "";
     newGradeInput.value = "";
     newPhoneSuffixInput.value = "";
+    newCanRenewDiscountSelect.value = "";
     newNoteInput.value = "";
     clearDirty();
 

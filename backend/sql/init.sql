@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS students_history (
     name VARCHAR(50) NOT NULL,
     grade VARCHAR(50) NULL,
     phone_suffix VARCHAR(20) NULL,
+    can_renew_discount BOOLEAN NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     note TEXT NULL
 );

@@ -32,6 +32,7 @@ class StudentHistory(Base):
     name: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     grade: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     phone_suffix: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    can_renew_discount: Mapped[bool] = mapped_column(Boolean, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

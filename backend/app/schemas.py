@@ -196,6 +196,7 @@ class StudentHistoryCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     grade: str | None = Field(default=None, max_length=50)
     phone_suffix: str | None = Field(default=None, max_length=20)
+    can_renew_discount: bool
     note: str | None = None
 
     @field_validator("name", "grade", "phone_suffix", "note")
@@ -214,6 +215,7 @@ class StudentHistoryOut(BaseModel):
     name: str
     grade: str | None
     phone_suffix: str | None
+    can_renew_discount: bool
     note: str | None
     created_at: datetime
 

@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models import Enrollment, Student
+from app.models import Enrollment, Student, StudentHistory
 from app.schemas import (
     BatchPayRequest,
     DiscountItem,
@@ -78,7 +78,7 @@ def test_pay_enrollment_enqueues_payment_notice(monkeypatch):
     db = _make_session()
     try:
         student = _seed_student(db)
-        enrollment = _seed_enrollment(db, student.id, status="quoted", final_price=980)
+        enrollment = _seed_enrollment(db, student.id, status="unconfirmed", final_price=980)
         db.commit()
 
         calls: list[tuple[str, str]] = []
@@ -94,10 +94,17 @@ def test_pay_enrollment_enqueues_payment_notice(monkeypatch):
             PayRequest(operator_name="财务", source="前台", note="现场已收款"),
         )
 
-        assert result["status"] == "paid"
+        assert result["status"] == "confirmed"
         assert calls
         assert calls[0][0] == "payment"
         assert "报名交费通知" in calls[0][1]
+
+        rows = db.query(StudentHistory).all()
+        assert len(rows) == 1
+        assert rows[0].name == student.name
+        assert rows[0].grade == enrollment.grade
+        assert rows[0].phone_suffix == student.phone
+        assert rows[0].can_renew_discount is False
     finally:
         db.close()
 
@@ -106,8 +113,8 @@ def test_pay_batch_enqueues_payment_notice_for_each_success(monkeypatch):
     db = _make_session()
     try:
         student = _seed_student(db)
-        e1 = _seed_enrollment(db, student.id, status="quoted", final_price=900)
-        e2 = _seed_enrollment(db, student.id, status="quoted", final_price=1100)
+        e1 = _seed_enrollment(db, student.id, status="unconfirmed", final_price=900)
+        e2 = _seed_enrollment(db, student.id, status="unconfirmed", final_price=1100)
         db.commit()
 
         sent_types: list[str] = []
@@ -124,6 +131,45 @@ def test_pay_batch_enqueues_payment_notice_for_each_success(monkeypatch):
 
         assert all(item["ok"] for item in result)
         assert sent_types == ["payment", "payment"]
+        rows = db.query(StudentHistory).all()
+        assert len(rows) == 1
+        assert rows[0].can_renew_discount is False
+    finally:
+        db.close()
+
+
+def test_pay_enrollment_keeps_existing_student_history_unchanged(monkeypatch):
+    db = _make_session()
+    try:
+        student = _seed_student(db)
+        enrollment = _seed_enrollment(db, student.id, status="unconfirmed", final_price=980)
+        db.add(
+            StudentHistory(
+                name=student.name,
+                grade=enrollment.grade,
+                phone_suffix=student.phone,
+                can_renew_discount=True,
+                note="手动配置",
+            )
+        )
+        db.commit()
+
+        monkeypatch.setattr(
+            enrollment_service.notification_service,
+            "enqueue_typed_text",
+            lambda **_: None,
+        )
+
+        enrollment_service.pay_enrollment(
+            db,
+            enrollment.id,
+            PayRequest(operator_name="财务", source="前台", note="现场已收款"),
+        )
+
+        rows = db.query(StudentHistory).all()
+        assert len(rows) == 1
+        assert rows[0].can_renew_discount is True
+        assert rows[0].note == "手动配置"
     finally:
         db.close()
 
@@ -132,7 +178,7 @@ def test_adjustment_decrease_enqueues_adjustment_and_refund_notice(monkeypatch):
     db = _make_session()
     try:
         student = _seed_student(db)
-        old = _seed_enrollment(db, student.id, status="paid", final_price=12000)
+        old = _seed_enrollment(db, student.id, status="confirmed", final_price=12000)
         db.commit()
 
         sent_types: list[str] = []

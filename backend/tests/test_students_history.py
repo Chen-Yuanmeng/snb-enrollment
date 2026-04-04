@@ -1,5 +1,7 @@
 from app.main import list_students_history
 from app.models import StudentHistory
+from app.schemas import StudentHistoryCreateRequest
+from app.services import student_history_service
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -15,11 +17,11 @@ def _make_session():
 
 def _seed_history(db):
     rows = [
-        StudentHistory(name="张三", grade="新高二暑", phone_suffix="0001", note="a"),
-        StudentHistory(name="李四", grade="新高二暑", phone_suffix="0002", note="b"),
-        StudentHistory(name="王五", grade="新高三暑", phone_suffix="0003", note="c"),
-        StudentHistory(name="赵六", grade="新高一暑", phone_suffix="0004", note="d"),
-        StudentHistory(name="钱七", grade="新高二暑", phone_suffix="0005", note="e"),
+        StudentHistory(name="张三", grade="新高二暑", phone_suffix="0001", can_renew_discount=True, note="a"),
+        StudentHistory(name="李四", grade="新高二暑", phone_suffix="0002", can_renew_discount=True, note="b"),
+        StudentHistory(name="王五", grade="新高三暑", phone_suffix="0003", can_renew_discount=False, note="c"),
+        StudentHistory(name="赵六", grade="新高一暑", phone_suffix="0004", can_renew_discount=True, note="d"),
+        StudentHistory(name="钱七", grade="新高二暑", phone_suffix="0005", can_renew_discount=False, note="e"),
     ]
     db.add_all(rows)
     db.commit()
@@ -61,5 +63,45 @@ def test_students_history_filter_and_limit_compatibility():
         assert compat.page == 1
         assert compat.page_size == 2
         assert len(compat.data) == 2
+    finally:
+        db.close()
+
+
+def test_search_for_renewal_only_returns_can_renew_discount_true():
+    db = _make_session()
+    try:
+        db.add_all(
+            [
+                StudentHistory(name="李雷", grade="新高一暑", phone_suffix="1001", can_renew_discount=True, note=None),
+                StudentHistory(name="李雷", grade="五一中考", phone_suffix="1002", can_renew_discount=False, note=None),
+                StudentHistory(name="李雷", grade="道法押题", phone_suffix="1003", can_renew_discount=True, note=None),
+            ]
+        )
+        db.commit()
+
+        rows = student_history_service.search_for_renewal(db, name="李雷", grade="2029届")
+        ids = {item["id"] for item in rows}
+        assert len(rows) == 2
+        assert all(item["phone_suffix"] in {"1001", "1003"} for item in rows)
+        assert all(item["id"] in ids for item in rows)
+    finally:
+        db.close()
+
+
+def test_create_student_history_requires_explicit_can_renew_discount_and_returns_field():
+    db = _make_session()
+    try:
+        payload = StudentHistoryCreateRequest(
+            operator_name="测试",
+            source="测试",
+            name="韩梅梅",
+            grade="新高二暑",
+            phone_suffix="7788",
+            can_renew_discount=False,
+            note="自动补录模拟",
+        )
+        created = student_history_service.create_student_history(db, payload)
+        assert created["name"] == "韩梅梅"
+        assert created["can_renew_discount"] is False
     finally:
         db.close()
