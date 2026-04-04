@@ -121,6 +121,15 @@ function mustOperatorAndSource() {
   return true;
 }
 
+function formatDateTime(value) {
+  if (!value) return "-";
+  const raw = String(value).trim();
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" });
+}
+
 function renderHistoryRows(rows) {
   if (!rows || rows.length === 0) {
     historyList.innerHTML = historyState.page > 1 ? "<p>当前页暂无老生记录</p>" : "<p>暂无老生记录</p>";
@@ -129,7 +138,7 @@ function renderHistoryRows(rows) {
 
   historyList.innerHTML = rows
     .map((item) => {
-      const createdAt = item.created_at ? new Date(item.created_at).toLocaleString() : "-";
+      const createdAt = formatDateTime(item.created_at);
       return `
         <div class='list-row'>
           <div class='history-main'>

@@ -104,7 +104,9 @@ function mustOperator() {
 
 function formatDateTime(value) {
   if (!value) return "-";
-  const date = new Date(value);
+  const raw = String(value).trim();
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" });
 }

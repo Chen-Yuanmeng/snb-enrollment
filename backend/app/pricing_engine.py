@@ -1,19 +1,33 @@
 import hashlib
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .database import SessionLocal
 from .models import Student, StudentHistory
 from .class_subject_meta import GRADE_CLASS_SUBJECT_OPTIONS
 from .constants import NON_EARLY_BIRD_VALID_UNTIL
+from .core.datetime_utils import utcnow_naive
 from .rules_loader import get_grade_rule
 from .schemas import QuoteCalculateRequest, QuoteResult
 
 
-EARLY_BIRD_STAGE_1 = datetime.fromisoformat("2026-05-15T23:59:59")
-EARLY_BIRD_STAGE_2 = datetime.fromisoformat("2026-06-15T23:59:59")
+SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
+
+
+def _parse_beijing_local_iso_to_utc_naive(value: str) -> datetime:
+    local_dt = datetime.fromisoformat(value)
+    if local_dt.tzinfo is None:
+        local_dt = local_dt.replace(tzinfo=SHANGHAI_TZ)
+    else:
+        local_dt = local_dt.astimezone(SHANGHAI_TZ)
+    return local_dt.astimezone(UTC).replace(tzinfo=None)
+
+
+EARLY_BIRD_STAGE_1 = _parse_beijing_local_iso_to_utc_naive("2026-05-15T23:59:59")
+EARLY_BIRD_STAGE_2 = _parse_beijing_local_iso_to_utc_naive("2026-06-15T23:59:59")
 
 
 def _rule(grade: str) -> dict:
@@ -157,7 +171,7 @@ def _stage_end_times(grade: str) -> list[datetime]:
         for raw in raw_ends[:2]:
             if isinstance(raw, str):
                 try:
-                    stage_ends.append(datetime.fromisoformat(raw))
+                    stage_ends.append(_parse_beijing_local_iso_to_utc_naive(raw))
                 except ValueError:
                     continue
     if len(stage_ends) >= 2:
@@ -498,6 +512,13 @@ def _format_price(value: float) -> str:
     return str(int(value)) if float(value).is_integer() else str(value)
 
 
+def _format_beijing_time(value: datetime) -> str:
+    # All persisted timestamps are treated as UTC-naive; convert on render.
+    aware_value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    shanghai_value = aware_value.astimezone(SHANGHAI_TZ)
+    return shanghai_value.strftime('%Y/%m/%d %H:%M:%S (北京时间)')
+
+
 def _get_name_and_info_from_student_id(student_id: int) -> str:
     default_name = "未知老生"
     default_grade = "年级未知"
@@ -591,7 +612,7 @@ def render_quote_text(req: QuoteCalculateRequest, quote: QuoteResult) -> str:
         f"报价: 【{_format_price(quote.final_price)}】",
         "--------------------------------",
         "提示:",
-        f"1. 本报价有效期至 {quote.quote_valid_until.strftime('%Y/%m/%d %H:%M:%S (北京时间)')}",
+        f"1. 本报价有效期至 {_format_beijing_time(quote.quote_valid_until)}",
         _render_prompt_text(quote, start_number=2)
     ]
 
@@ -613,14 +634,14 @@ def render_quote_text_internal(req: QuoteCalculateRequest, quote: QuoteResult) -
         "--------------------------------" if quote.discount_info else "",
         f"报价: {_format_price(quote.final_price)}",
         f"算式: {quote.pricing_formula}",
-        f"报价有效期至 {quote.quote_valid_until.strftime('%Y/%m/%d %H:%M:%S (北京时间)')}",
+        f"报价有效期至 {_format_beijing_time(quote.quote_valid_until)}",
     ]
 
     return "\n".join(lines)
 
 
 def build_quote(req: QuoteCalculateRequest, now: datetime | None = None) -> QuoteResult:
-    current = now or datetime.now()
+    current = now or utcnow_naive()
     _validate_request(req)
     base_price, base_expr = _calc_base_price(req)
     discount_total, discount_info, non_price_benefits = _calc_discounts(req, current)

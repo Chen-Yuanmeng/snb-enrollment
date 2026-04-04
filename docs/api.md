@@ -5,6 +5,8 @@
 - Content-Type: application/json
 - 写接口必须传 `operator_name` 与 `source`
 - 金额由后端复算，前端金额仅作展示参考
+- 时间字段语义：API 中 datetime 字段当前按 UTC naive 语义返回（多数为不带时区后缀的 ISO 字符串）
+- 前端展示约定：所有页面统一按 Asia/Shanghai 进行时间展示，不使用浏览器默认时区
 
 统一返回结构：
 - 成功：{ code: 0, message: "ok", data: ... }

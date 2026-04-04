@@ -124,6 +124,15 @@ function shortGradeName(name) {
   return `${name.slice(0, 6)}...`;
 }
 
+function formatDateTime(value) {
+  if (!value) return "-";
+  const raw = String(value).trim();
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" });
+}
+
 function normalizeDiscountItem(item) {
   if (typeof item === "string") {
     const name = item.trim();
@@ -848,7 +857,7 @@ function renderQuoteText(payload, quoteData) {
     `优惠: ${quoteData.discount_total}`,
     `报价: ${quoteData.final_price}`,
     `算式: ${quoteData.pricing_formula}`,
-    `有效期: ${quoteData.quote_valid_until}`,
+    `有效期: ${formatDateTime(quoteData.quote_valid_until)}`,
   ];
 
   if (quoteData.non_price_benefits && quoteData.non_price_benefits.length > 0) {

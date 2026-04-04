@@ -26,7 +26,7 @@ def test_g2_offline_base_price():
     assert quote.base_price == 5040 * 2
     assert quote.discount_info.get("早鸟") == 200
     assert quote.final_price == 9880
-    assert "张三 / 13800000000" in quote.quote_text
+    assert "学生姓名: 张三 家长电话: 13800000000" in quote.quote_text
     assert "提示:" in quote.quote_text
 
 
@@ -34,7 +34,7 @@ def test_internal_quote_text_differs_from_front_text():
     req = _base_req()
     quote = build_quote(req, now=datetime.fromisoformat("2026-05-10T12:00:00"))
     internal_text = render_quote_text_internal(req, quote)
-    assert "【报价通知-内部】" in internal_text
+    assert "【报价通知】" in internal_text
     assert "操作人: 张老师" in internal_text
     assert internal_text != quote.quote_text
 
@@ -61,8 +61,10 @@ def test_non_early_bird_valid_until_fixed():
 
 def test_early_bird_window_under_30m():
     req = _base_req(discounts=[DiscountItem(name="早鸟", amount=100)])
-    quote = build_quote(req, now=datetime.fromisoformat("2026-05-15T23:50:00"))
-    assert quote.quote_valid_until.isoformat() == "2026-05-16T00:20:00"
+    # 2026-05-15 23:50:00 北京时间 = 2026-05-15 15:50:00 UTC
+    quote = build_quote(req, now=datetime.fromisoformat("2026-05-15T15:50:00"))
+    assert quote.quote_valid_until.isoformat() == "2026-05-15T16:20:00"
+    assert "本报价有效期至 2026/05/16 00:20:00 (北京时间)" in quote.quote_text
 
 
 def test_auto_early_bird_applied_for_g1_without_discount_input():
