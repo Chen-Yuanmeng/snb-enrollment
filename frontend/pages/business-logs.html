@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>业务日志</title>
+    <link rel="stylesheet" href="../assets/css/styles.css?v=20260407a" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-main">
+        <h1>业务日志</h1>
+        <nav class="topbar-links">
+          <a href="../index.html" target="_blank" rel="noopener noreferrer">返回主页</a>
+          <a href="./system-access-logs.html" target="_blank" rel="noopener noreferrer">访问日志</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <h2>筛选条件</h2>
+        <div class="field-grid three-col">
+          <label>
+            操作员
+            <input id="operatorNameFilter" type="text" placeholder="例如：赵老师" />
+          </label>
+          <label>
+            来源
+            <input id="sourceFilter" type="text" placeholder="例如：大号" />
+          </label>
+          <label>
+            动作类型
+            <input id="actionTypeFilter" type="text" placeholder="例如：create_enrollment" />
+          </label>
+          <label>
+            目标类型
+            <input id="targetTypeFilter" type="text" placeholder="例如：enrollment" />
+          </label>
+          <label>
+            每页条数
+            <select id="pageSizeFilter">
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="refreshBtn" type="button">查询</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>日志列表</h2>
+        <div id="logPagination" class="pagination"></div>
+        <div id="logTableWrap" class="log-table-wrap">加载中...</div>
+      </section>
+    </main>
+
+    <script src="../assets/js/business-logs.js?v=20260407a"></script>
+  </body>
+</html>
