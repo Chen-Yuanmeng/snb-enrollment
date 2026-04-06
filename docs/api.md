@@ -205,6 +205,22 @@
 - 参数（可选）：operator_name, source, action_type, target_type, page, page_size
 - 返回：操作日志列表（含 operator_name 与 source）
 
+### GET /system-access-logs
+- 说明：读取 systemd 中 snb-enrollment.service 的访问日志并返回分页结果
+- 参数（可选）：
+  - since（例如 `2026-04-07 00:00:00`）
+  - until（例如 `2026-04-07 23:59:59`）
+  - ip（精确匹配）
+  - method（GET/POST/PUT/PATCH/DELETE）
+  - path_keyword（路径包含匹配）
+  - status_code（HTTP 状态码）
+  - page（默认1）
+  - page_size（默认20，最大100）
+  - max_lines（默认2000，最大10000，用于限制每次从 systemd 读取的日志行数）
+- 返回：
+  - data：访问日志列表（timestamp, ip, method, path, status_code, raw）
+  - total, page, page_size：分页元数据
+
 ## 7. 健康检查
 ### GET /health
 - 返回：服务状态与数据库连通状态
