@@ -82,6 +82,23 @@ function totalPages() {
   return Math.max(pages, 1);
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function toPageInRange(rawPage) {
+  const page = Number(rawPage);
+  if (!Number.isFinite(page)) return null;
+  const normalized = Math.floor(page);
+  if (normalized < 1) return null;
+  return Math.min(normalized, totalPages());
+}
+
 function renderPagination() {
   if (!accessPagination) return;
 
@@ -96,6 +113,11 @@ function renderPagination() {
       <button type='button' class='pagination-btn pagination-nav-btn' data-page='${state.page - 1}' ${state.page <= 1 ? "disabled" : ""}>上一页</button>
       <span class='pagination-summary'>第 ${state.page}/${pages} 页，共 ${state.total} 条</span>
       <button type='button' class='pagination-btn pagination-nav-btn' data-page='${state.page + 1}' ${state.page >= pages ? "disabled" : ""}>下一页</button>
+      <span class='pagination-jump'>
+        <span class='pagination-jump-label'>跳转到</span>
+        <input class='pagination-jump-input' type='number' min='1' max='${pages}' value='${state.page}' />
+        <button type='button' class='pagination-btn pagination-jump-btn' data-action='jump'>前往</button>
+      </span>
     </div>
   `;
 }
@@ -123,10 +145,16 @@ function renderRows(rows) {
             (item) => `
           <tr>
             <td>${formatDateTime(item.timestamp)}</td>
-            <td>${item.ip || "-"}</td>
-            <td>${item.method || "-"}</td>
-            <td class='log-message'>${item.path || "-"}</td>
-            <td>${item.status_code || "-"}</td>
+            <td>
+              ${
+                item.ip
+                  ? `<button type='button' class='table-link-btn ip-link-btn' data-ip='${escapeHtml(item.ip)}'>${escapeHtml(item.ip)}</button>`
+                  : "-"
+              }
+            </td>
+            <td>${escapeHtml(item.method || "-")}</td>
+            <td class='log-message'>${escapeHtml(item.path || "-")}</td>
+            <td>${escapeHtml(item.status_code || "-")}</td>
           </tr>
         `
           )
@@ -196,6 +224,16 @@ accessPagination.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
 
+  if (target.getAttribute("data-action") === "jump") {
+    const input = accessPagination.querySelector(".pagination-jump-input");
+    if (!(input instanceof HTMLInputElement)) return;
+    const page = toPageInRange(input.value);
+    if (!page || page === state.page) return;
+    state.page = page;
+    loadAccessLogs();
+    return;
+  }
+
   const page = Number(target.getAttribute("data-page") || 0);
   if (!Number.isFinite(page) || page < 1 || page === state.page) {
     return;
@@ -203,6 +241,16 @@ accessPagination.addEventListener("click", (event) => {
 
   state.page = page;
   loadAccessLogs();
+});
+
+accessTableWrap.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (!target.classList.contains("ip-link-btn")) return;
+
+  const ip = target.getAttribute("data-ip") || "";
+  if (!ip) return;
+  window.location.href = `./ip-access-analysis.html?ip=${encodeURIComponent(ip)}`;
 });
 
 async function init() {

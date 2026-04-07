@@ -19,7 +19,7 @@ def list_logs(
     page_size: int = 20,
     db: Session = Depends(get_db),
 ) -> ApiResponse:
-    data = log_service.list_logs(
+    payload = log_service.list_logs(
         db=db,
         operator_name=operator_name,
         source=source,
@@ -28,7 +28,12 @@ def list_logs(
         page=page,
         page_size=page_size,
     )
-    return ApiResponse(data=data)
+    return ApiResponse(
+        data=payload["items"],
+        total=payload["total"],
+        page=payload["page"],
+        page_size=payload["page_size"],
+    )
 
 
 @router.get(f"{config.api_prefix}/system-access-logs", response_model=ApiResponse)
@@ -60,3 +65,33 @@ def list_system_access_logs(
         page=data["page"],
         page_size=data["page_size"],
     )
+
+
+@router.get(f"{config.api_prefix}/system-access-logs/ip-summary", response_model=ApiResponse)
+def get_system_access_ip_summary(
+    ip: str,
+    since: str | None = None,
+    until: str | None = None,
+    max_lines: int = 10000,
+) -> ApiResponse:
+    data = system_log_service.summarize_system_access_logs_by_ip(
+        ip=ip,
+        since=since,
+        until=until,
+        max_lines=max_lines,
+    )
+    return ApiResponse(data=data)
+
+
+@router.get(f"{config.api_prefix}/system-access-logs/ip-hourly", response_model=ApiResponse)
+def get_system_access_ip_hourly(
+    ip: str,
+    last_hours: int = 24,
+    max_lines: int = 10000,
+) -> ApiResponse:
+    data = system_log_service.summarize_system_access_logs_by_ip_hourly(
+        ip=ip,
+        last_hours=last_hours,
+        max_lines=max_lines,
+    )
+    return ApiResponse(data=data)

@@ -203,7 +203,7 @@
 ## 6. 日志
 ### GET /logs
 - 参数（可选）：operator_name, source, action_type, target_type, page, page_size
-- 返回：操作日志列表（含 operator_name 与 source）
+- 返回：操作日志列表（含 operator_name 与 source），并返回分页元数据 `total`, `page`, `page_size`
 
 ### GET /system-access-logs
 - 说明：读取 systemd 中 snb-enrollment.service 的访问日志并返回分页结果
@@ -220,6 +220,31 @@
 - 返回：
   - data：访问日志列表（timestamp, ip, method, path, status_code, raw）
   - total, page, page_size：分页元数据
+
+### GET /system-access-logs/ip-summary
+- 说明：按 IP + 时间范围统计访问次数（专用统计接口，不分页）
+- 参数：
+  - ip（必填，IPv4/IPv6）
+  - since（可选，例如 `2026-04-07 00:00:00`）
+  - until（可选，例如 `2026-04-07 23:59:59`）
+  - max_lines（默认10000，最大10000，用于限制每次从 systemd 读取的日志行数）
+- 返回：
+  - ip, since, until
+  - count（命中访问次数）
+  - line_scan_count, line_scan_limit, truncated（用于提示统计是否可能被上限截断）
+  - location（IP归属地信息，来自 `https://ip.zxinc.org/api.php?type=json&ip=...`，请求头 User-Agent 固定为 `snb-enrollment-flow-control/1.0`）
+
+### GET /system-access-logs/ip-hourly
+- 说明：按 IP 统计最近 N 小时逐小时访问次数（专用统计接口，不分页）
+- 参数：
+  - ip（必填，IPv4/IPv6）
+  - last_hours（可选，默认24，最大168）
+  - max_lines（默认10000，最大10000）
+- 返回：
+  - ip, last_hours, since, until
+  - total（时间窗口内总访问次数）
+  - buckets（数组，元素为 `hour` + `count`）
+  - line_scan_count, line_scan_limit, truncated
 
 ## 7. 健康检查
 ### GET /health

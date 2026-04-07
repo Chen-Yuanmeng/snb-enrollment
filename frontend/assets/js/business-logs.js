@@ -46,8 +46,8 @@ const logPagination = document.querySelector("#logPagination");
 const state = {
   page: 1,
   pageSize: 20,
+  total: 0,
   isLoading: false,
-  hasNextPage: false,
 };
 
 async function fetchJson(url, options = {}) {
@@ -72,13 +72,37 @@ function formatDateTime(value) {
   return date.toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" });
 }
 
+function totalPages() {
+  const pages = Math.ceil((state.total || 0) / state.pageSize);
+  return Math.max(pages, 1);
+}
+
+function toPageInRange(rawPage) {
+  const page = Number(rawPage);
+  if (!Number.isFinite(page)) return null;
+  const normalized = Math.floor(page);
+  if (normalized < 1) return null;
+  return Math.min(normalized, totalPages());
+}
+
 function renderPagination() {
   if (!logPagination) return;
+  if (!state.total) {
+    logPagination.innerHTML = "";
+    return;
+  }
+
+  const pages = totalPages();
   logPagination.innerHTML = `
     <div class='pagination-controls'>
       <button type='button' class='pagination-btn pagination-nav-btn' data-page='${state.page - 1}' ${state.page <= 1 ? "disabled" : ""}>上一页</button>
-      <span class='pagination-summary'>当前第 ${state.page} 页</span>
-      <button type='button' class='pagination-btn pagination-nav-btn' data-page='${state.page + 1}' ${state.hasNextPage ? "" : "disabled"}>下一页</button>
+      <span class='pagination-summary'>第 ${state.page}/${pages} 页，共 ${state.total} 条</span>
+      <button type='button' class='pagination-btn pagination-nav-btn' data-page='${state.page + 1}' ${state.page >= pages ? "disabled" : ""}>下一页</button>
+      <span class='pagination-jump'>
+        <span class='pagination-jump-label'>跳转到</span>
+        <input class='pagination-jump-input' type='number' min='1' max='${pages}' value='${state.page}' />
+        <button type='button' class='pagination-btn pagination-jump-btn' data-action='jump'>前往</button>
+      </span>
     </div>
   `;
 }
@@ -153,12 +177,16 @@ async function loadLogs() {
     const result = await fetchJson(`${API_BASE}/logs?${query.toString()}`);
     const rows = Array.isArray(result.data) ? result.data : [];
 
-    state.hasNextPage = rows.length >= state.pageSize;
+    state.total = Number(result.total || rows.length || 0);
+    if (state.page > totalPages()) {
+      state.page = totalPages();
+    }
+
     renderRows(rows);
     renderPagination();
   } catch (error) {
     logTableWrap.innerHTML = `<p>加载失败：${error.message}</p>`;
-    state.hasNextPage = false;
+    state.total = 0;
     renderPagination();
   } finally {
     state.isLoading = false;
@@ -174,6 +202,16 @@ refreshBtn.addEventListener("click", () => {
 logPagination.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
+
+  if (target.getAttribute("data-action") === "jump") {
+    const input = logPagination.querySelector(".pagination-jump-input");
+    if (!(input instanceof HTMLInputElement)) return;
+    const page = toPageInRange(input.value);
+    if (!page || page === state.page) return;
+    state.page = page;
+    loadLogs();
+    return;
+  }
 
   const page = Number(target.getAttribute("data-page") || 0);
   if (!Number.isFinite(page) || page < 1 || page === state.page) {

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IP访问分析</title>
+    <link rel="stylesheet" href="../assets/css/styles.css?v=20260407d" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-main">
+        <h1>IP访问分析</h1>
+        <nav class="topbar-links">
+          <a href="../index.html" target="_blank" rel="noopener noreferrer">返回主页</a>
+          <a href="./system-access-logs.html" target="_blank" rel="noopener noreferrer">访问日志</a>
+          <a href="./business-logs.html" target="_blank" rel="noopener noreferrer">业务日志</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <h2>查询条件</h2>
+        <div class="field-grid three-col">
+          <label>
+            IP
+            <input id="ipInput" type="text" placeholder="例如：1.2.3.4" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="analyzeBtn" type="button">分析</button>
+        </div>
+        <p class="hint-text">点击分析后将自动查询：最近5分钟访问次数、最近24小时逐小时访问次数。</p>
+      </section>
+
+      <section class="card">
+        <h2>分析结果</h2>
+        <div id="summaryWrap" class="ip-summary-wrap">请输入 IP 并点击“分析”。</div>
+      </section>
+    </main>
+
+    <script src="../assets/js/ip-access-analysis.js?v=20260407d"></script>
+  </body>
+</html>

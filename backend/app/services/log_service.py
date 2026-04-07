@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.models import OperationLog
@@ -14,7 +14,10 @@ def list_logs(
     target_type: str | None = None,
     page: int = 1,
     page_size: int = 20,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
+    normalized_page = max(1, page)
+    normalized_page_size = max(1, min(page_size, 200))
+
     stmt = select(OperationLog)
     if operator_name:
         stmt = stmt.where(OperationLog.operator_name == operator_name)
@@ -25,10 +28,14 @@ def list_logs(
     if target_type:
         stmt = stmt.where(OperationLog.target_type == target_type)
 
-    stmt = stmt.order_by(desc(OperationLog.id)).offset((page - 1) * page_size).limit(page_size)
+    total_stmt = select(func.count()).select_from(stmt.subquery())
+    total = int(db.scalar(total_stmt) or 0)
+
+    stmt = stmt.order_by(desc(OperationLog.id)).offset((normalized_page - 1) * normalized_page_size).limit(normalized_page_size)
     rows = db.scalars(stmt).all()
 
-    return [
+    return {
+        "items": [
         {
             "id": row.id,
             "operator_name": row.operator_name,
@@ -41,4 +48,8 @@ def list_logs(
             "created_at": row.created_at,
         }
         for row in rows
-    ]
+        ],
+        "total": total,
+        "page": normalized_page,
+        "page_size": normalized_page_size,
+    }
