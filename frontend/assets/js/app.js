@@ -185,6 +185,16 @@ function getAutoDiscountInput(discountName) {
   );
 }
 
+function setAutoDiscountInputsDisabled(disabled) {
+  discountWrap.querySelectorAll("input[name='discount'][data-discount-mode='auto']").forEach((input) => {
+    input.disabled = disabled;
+    const row = input.closest(".choice-item");
+    if (row) {
+      row.classList.toggle("disabled", disabled);
+    }
+  });
+}
+
 function clearAutoDiscountSelectionState() {
   autoDiscountCheckedNames.clear();
   autoRenewalHistoryStudentId = 0;
@@ -193,6 +203,7 @@ function clearAutoDiscountSelectionState() {
   autoWuyiIdentityKey = "";
   discountWrap.querySelectorAll("input[name='discount'][data-discount-mode='auto']").forEach((input) => {
     input.checked = false;
+    input.setAttribute("data-last-checked", "false");
   });
   refreshHistoryArea();
 }
@@ -206,6 +217,7 @@ function setAutoDiscountChecked(discountName, checked) {
   const input = getAutoDiscountInput(discountName);
   if (input) {
     input.checked = checked;
+    input.setAttribute("data-last-checked", checked ? "true" : "false");
   }
 }
 
@@ -390,6 +402,7 @@ async function refreshAutoDiscountsByIdentity() {
 
   if (!studentName || !studentPhone) {
     clearAutoDiscountSelectionState();
+    setAutoDiscountInputsDisabled(true);
     renderDiscountNotes(conf);
     return;
   }
@@ -419,6 +432,7 @@ async function refreshAutoDiscountsByIdentity() {
       autoWuyiCaseInput = Number(wuyiResult.caseInput || 0);
       autoWuyiIdentityKey = getIdentityKey(conf.grade, studentName, studentPhone);
     }
+    setAutoDiscountInputsDisabled(false);
     refreshHistoryArea();
     renderDiscountNotes(conf);
   } catch (error) {
@@ -426,6 +440,7 @@ async function refreshAutoDiscountsByIdentity() {
       return;
     }
     clearAutoDiscountSelectionState();
+    setAutoDiscountInputsDisabled(false);
     renderDiscountNotes(conf, `自动优惠检查失败：${error.message}`);
   }
 }
@@ -571,7 +586,7 @@ function renderActiveGradeForm() {
       const checked = isAuto && evaluateAutoDiscount(conf, item.name) ? "checked" : "";
       const disabled = isAuto ? "disabled" : "";
       const row = renderChoiceRow(
-        `<input type="checkbox" name="discount" value="${item.name}" data-discount-mode="${item.mode}" ${disabled} ${checked} />`,
+        `<input type="checkbox" name="discount" value="${item.name}" data-discount-mode="${item.mode}" data-last-checked="${checked ? "true" : "false"}" ${disabled} ${checked} />`,
         text
       );
       return isAuto ? row.replace("choice-item", "choice-item disabled") : row;
@@ -605,7 +620,22 @@ function renderActiveGradeForm() {
     item.addEventListener("change", refreshMixedModeRows);
   });
   discountWrap.querySelectorAll("input[name='discount']").forEach((item) => {
-    item.addEventListener("change", refreshHistoryArea);
+    item.addEventListener("change", () => {
+      const isAuto = item.getAttribute("data-discount-mode") === "auto";
+      const previousChecked = item.getAttribute("data-last-checked") === "true";
+      const currentChecked = item.checked;
+
+      if (isAuto && previousChecked !== currentChecked) {
+        const ok = window.confirm("确定要改动该自动选择项？");
+        if (!ok) {
+          item.checked = previousChecked;
+          return;
+        }
+      }
+
+      item.setAttribute("data-last-checked", item.checked ? "true" : "false");
+      refreshHistoryArea();
+    });
   });
 }
 

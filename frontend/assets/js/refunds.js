@@ -354,13 +354,10 @@ function renderDiscounts(rule) {
     newDiscountWrap.classList.add(gridClassByLength(discounts.length));
     newDiscountWrap.innerHTML = discounts
       .map((item) => {
-        const isAuto = item.mode === "auto";
-        const disabled = isAuto ? "disabled" : "";
-        const row = renderChoiceRow(
-          `<input type='checkbox' name='refundDiscount' value='${item.name}' data-discount-mode='${item.mode}' ${disabled} />`,
+        return renderChoiceRow(
+          `<input type='checkbox' name='refundDiscount' value='${item.name}' data-discount-mode='${item.mode}' />`,
           getDiscountLabel(rule, item.name)
         );
-        return isAuto ? row.replace("choice-item", "choice-item disabled") : row;
       })
       .join("");
   }
