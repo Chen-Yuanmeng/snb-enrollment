@@ -383,8 +383,6 @@ def _discount_amount_from_cfg(name: str, cfg: dict, raw_amount: float, now: date
         min_value = float(params.get("min_value", 0))
         max_value = float(params.get("max_value", raw_amount if raw_amount >= 0 else 0))
         if raw_amount < min_value or raw_amount > max_value:
-            if name == "优秀生第四档":
-                raise ValueError("优秀生第四档优惠不能超过600")
             raise ValueError(f"{name}金额需在{int(min_value)}到{int(max_value)}之间")
         return raw_amount
 

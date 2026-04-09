@@ -58,11 +58,11 @@
     ],
     [
       {
-        "name": "中原领军4",
+        "name": "中原领军3",
         "pricing_strategy": "lingjun24"
       },
       {
-        "name": "中原领军4 (无语英)",
+        "name": "中原领军3 (无语英)",
         "pricing_strategy": "lingjun24nocnen"
       }
     ]
@@ -107,13 +107,13 @@
         "value": 600
       },
       {
-        "name": "优秀生第四档",
+        "name": "考分优惠",
         "enabled": true,
         "strategy": "from_input",
         "params": {
           "min_value": 0,
           "max_value": 600,
-          "placeholder": "请输入优秀生优惠金额"
+          "placeholder": "请输入考分优惠金额"
         }
       },
       {
@@ -295,25 +295,35 @@
     {
       "name": "优秀生第一档",
       "requires_history_student": false,
-      "exclusive_with": [],
+      "exclusive_with": [
+        "考分优惠"
+      ],
       "mode": "manual"
     },
     {
       "name": "优秀生第二档",
       "requires_history_student": false,
-      "exclusive_with": [],
+      "exclusive_with": [
+        "考分优惠"
+      ],
       "mode": "manual"
     },
     {
       "name": "优秀生第三档",
       "requires_history_student": false,
-      "exclusive_with": [],
+      "exclusive_with": [
+        "考分优惠"
+      ],
       "mode": "manual"
     },
     {
-      "name": "优秀生第四档",
+      "name": "考分优惠",
       "requires_history_student": false,
-      "exclusive_with": [],
+      "exclusive_with": [
+        "优秀生第一档",
+        "优秀生第二档",
+        "优秀生第三档"
+      ],
       "mode": "manual"
     },
     {

@@ -117,3 +117,48 @@ def test_g3_removed_video_course():
         assert False, "should raise"
     except ValueError as exc:
         assert "新一试" in str(exc)
+
+
+def test_g1_score_discount_within_limit():
+    req = _base_req(
+        grade="新高一暑",
+        class_mode="线下",
+        class_subjects=["高新领军1"],
+        discounts=[DiscountItem(name="考分优惠", amount=600)],
+    )
+    quote = build_quote(req, now=datetime.fromisoformat("2026-05-10T12:00:00"))
+    assert quote.discount_info.get("考分优惠") == 600
+
+
+def test_g1_score_discount_over_limit_should_fail():
+    req = _base_req(
+        grade="新高一暑",
+        class_mode="线下",
+        class_subjects=["高新领军1"],
+        discounts=[DiscountItem(name="考分优惠", amount=601)],
+    )
+    try:
+        build_quote(req)
+        assert False, "should raise"
+    except ValueError as exc:
+        assert "考分优惠金额需在0到600之间" in str(exc)
+
+
+def test_g1_score_discount_is_exclusive_with_excellent_tiers():
+    req = _base_req(
+        grade="新高一暑",
+        class_mode="线下",
+        class_subjects=["高新领军1"],
+        discounts=[
+            DiscountItem(name="优秀生第一档", amount=0),
+            DiscountItem(name="考分优惠", amount=200),
+        ],
+    )
+    try:
+        build_quote(req)
+        assert False, "should raise"
+    except ValueError as exc:
+        text = str(exc)
+        assert "不能同时选择" in text
+        assert "优秀生第一档" in text
+        assert "考分优惠" in text

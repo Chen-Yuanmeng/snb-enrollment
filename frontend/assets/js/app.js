@@ -157,8 +157,9 @@ function normalizeDiscountItem(item) {
 function normalizeDiscounts(discounts) {
   const list = Array.isArray(discounts) ? discounts : [];
   const normalized = list.map(normalizeDiscountItem).filter(Boolean);
-  const hasExcellent = normalized.some((item) => item.name.startsWith("优秀生"));
-  const nonExcellent = normalized.filter((item) => !item.name.startsWith("优秀生"));
+  const excellentNames = new Set(["优秀生第一档", "优秀生第二档", "优秀生第三档"]);
+  const hasExcellent = normalized.some((item) => excellentNames.has(item.name));
+  const nonExcellent = normalized.filter((item) => !excellentNames.has(item.name));
   return hasExcellent ? [...nonExcellent, { name: "优秀生", mode: "manual" }] : nonExcellent;
 }
 
@@ -563,7 +564,9 @@ function renderActiveGradeForm() {
     .join("");
 
   discountWrap.classList.remove("grid-1", "grid-2", "grid-3");
-  _length = conf.discounts.filter((item) => item.name !== "优秀生").length;
+  const standardDiscountCount = conf.discounts.filter((item) => item.name !== "优秀生" && item.name !== "考分优惠").length;
+  const scoreDiscountCount = hasDiscount(conf, "考分优惠") ? 1 : 0;
+  _length = standardDiscountCount + scoreDiscountCount;
   switch (_length) {
     case 3:
     case 5:
@@ -579,7 +582,7 @@ function renderActiveGradeForm() {
   }
 
   discountWrap.innerHTML = conf.discounts
-    .filter((item) => item.name !== "优秀生")
+    .filter((item) => item.name !== "优秀生" && item.name !== "考分优惠")
     .map((item) => {
       const text = getDiscountLabel(conf, item.name);
       const isAuto = item.mode === "auto";
@@ -593,16 +596,33 @@ function renderActiveGradeForm() {
     })
     .join("");
 
+  if (hasDiscount(conf, "考分优惠")) {
+    discountWrap.innerHTML += [
+      renderChoiceRow("<input type='checkbox' name='discount' value='考分优惠' data-discount-mode='manual' data-last-checked='false' />", "考分优惠"),
+      "<input id='scoreDiscountAmount' type='number' min='0' max='600' step='1' placeholder='考分优惠金额' />",
+    ].join("");
+  }
+
   if (hasDiscount(conf, "优秀生")) {
     excellentWrap.classList.remove("hidden");
     excellentWrap.innerHTML = [
-      "<p class='hint'>优秀生（四档）</p>",
+      "<p class='hint'>优秀生（三档） <a href='#' class='hint-action-link' id='clearExcellentLink'>清除选择</a></p>",
+      "<div class='choice-grid grid-3 excellent-options'>",
       renderChoiceRow("<input type='radio' name='excellent' value='优秀生第一档' />", "第一档 1000"),
       renderChoiceRow("<input type='radio' name='excellent' value='优秀生第二档' />", "第二档 800"),
       renderChoiceRow("<input type='radio' name='excellent' value='优秀生第三档' />", "第三档 600"),
-      renderChoiceRow("<input type='radio' name='excellent' value='优秀生第四档' />", "第四档（手动填写）"),
-      "<input id='excellentManualAmount' type='number' min='0' max='600' step='1' placeholder='手动优惠金额（不超过600）' />",
+      "</div>",
     ].join("");
+
+    const clearExcellentLink = excellentWrap.querySelector("#clearExcellentLink");
+    if (clearExcellentLink) {
+      clearExcellentLink.addEventListener("click", (event) => {
+        event.preventDefault();
+        excellentWrap.querySelectorAll("input[name='excellent']").forEach((input) => {
+          input.checked = false;
+        });
+      });
+    }
   } else {
     excellentWrap.classList.add("hidden");
     excellentWrap.innerHTML = "";
@@ -801,6 +821,11 @@ async function buildDiscountPayload(conf, studentName, studentPhone) {
     throw new Error("老带新与老生续报不能同时选择");
   }
 
+  const excellent = quoteForm.querySelector("input[name='excellent']:checked")?.value;
+  if (picked.includes("考分优惠") && excellent) {
+    throw new Error("考分优惠与优秀生优惠不能同时选择");
+  }
+
   picked.forEach((name) => {
     const item = { name, amount: 0 };
     if (name === "老带新" && referralHistoryStudentId > 0) {
@@ -812,6 +837,14 @@ async function buildDiscountPayload(conf, studentName, studentPhone) {
     if (name === "五一报名优惠") {
       item.amount = autoWuyiIdentityKey === identityKey ? Number(autoWuyiCaseInput || 0) : 0;
     }
+    if (name === "考分优惠") {
+      const manualInput = document.querySelector("#scoreDiscountAmount");
+      const manualAmount = Number(manualInput?.value || 0);
+      if (Number.isNaN(manualAmount) || manualAmount < 0 || manualAmount > 600) {
+        throw new Error("考分优惠金额需在0到600之间");
+      }
+      item.amount = manualAmount;
+    }
     discountItems.push(item);
   });
 
@@ -820,17 +853,8 @@ async function buildDiscountPayload(conf, studentName, studentPhone) {
   }
 
   if (hasDiscount(conf, "优秀生")) {
-    const excellent = quoteForm.querySelector("input[name='excellent']:checked")?.value;
     if (excellent) {
       const item = { name: excellent, amount: 0 };
-      if (excellent === "优秀生第四档") {
-        const manualInput = document.querySelector("#excellentManualAmount");
-        const manualAmount = Number(manualInput?.value || 0);
-        if (Number.isNaN(manualAmount) || manualAmount < 0 || manualAmount > 600) {
-          throw new Error("优秀生第四档金额需在0到600之间");
-        }
-        item.amount = manualAmount;
-      }
       discountItems.push(item);
     }
   }

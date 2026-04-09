@@ -321,6 +321,16 @@ button.secondary {
   background: #fbfbfb;
 }
 
+.excellent-options {
+  margin-bottom: 6px;
+}
+
+.hint-action-link {
+  color: #2a4d86;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .hint,
 .discount-note {
   margin: 0 0 8px;
