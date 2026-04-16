@@ -1,12 +1,12 @@
 {
-  "version": "2026.03.26",
+  "version": "2026.04.17",
   "timezone": "Asia/Shanghai",
   "default_quote_valid_minutes": 30,
   "grades": [
     {
       "grade": "4.18-19初中道法",
       "file": "grades/g4_18_ethics.json",
-      "enabled": true
+      "enabled": false
     },
     {
       "grade": "五一中考",

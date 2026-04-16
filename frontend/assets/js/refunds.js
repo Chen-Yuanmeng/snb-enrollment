@@ -8,6 +8,18 @@ const DISCOUNT_LABELS = {
   现金优惠: "现金优惠",
 };
 
+const LEGACY_DISCOUNT_NAME_MAP = {
+  老带新28天: "老带新",
+  老带新24天: "老带新",
+  老带新21天: "老带新",
+};
+
+function canonicalizeDiscountName(name) {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return "";
+  return LEGACY_DISCOUNT_NAME_MAP[trimmed] || trimmed;
+}
+
 function apiCandidates() {
   const candidates = [`${window.location.origin}/api/v1`];
   if (!window.location.origin.includes(":5555")) {
@@ -149,13 +161,13 @@ function mustOperator() {
 
 function normalizeDiscountItem(item) {
   if (typeof item === "string") {
-    const name = item.trim();
+    const name = canonicalizeDiscountName(item);
     return name ? { name, mode: "manual" } : null;
   }
   if (!item || typeof item !== "object") {
     return null;
   }
-  const name = String(item.name || "").trim();
+  const name = canonicalizeDiscountName(item.name);
   if (!name) {
     return null;
   }
@@ -169,7 +181,10 @@ function normalizeDiscountItem(item) {
 
 function normalizeDiscounts(discounts) {
   const list = Array.isArray(discounts) ? discounts : [];
-  const normalized = list.map(normalizeDiscountItem).filter(Boolean);
+  const normalized = list
+    .map(normalizeDiscountItem)
+    .filter(Boolean)
+    .filter((item, idx, arr) => arr.findIndex((x) => x.name === item.name) === idx);
   const excellentNames = new Set(["优秀生第一档", "优秀生第二档", "优秀生第三档"]);
   const hasExcellent = normalized.some((item) => excellentNames.has(item.name));
   const nonExcellent = normalized.filter((item) => !excellentNames.has(item.name));
@@ -190,7 +205,7 @@ function selectedDiscounts() {
 }
 
 function buildDiscountItems() {
-  const picked = selectedDiscounts();
+  const picked = selectedDiscounts().map(canonicalizeDiscountName);
   const discountItems = [];
 
   if (picked.includes("老带新") && picked.includes("老生续报")) {
@@ -232,7 +247,7 @@ function buildDiscountItems() {
 
 function applyDiscountsByNames(names) {
   const wanted = new Set(
-    (names || []).filter(
+    (names || []).map(canonicalizeDiscountName).filter(
       (name) => !["优秀生第一档", "优秀生第二档", "优秀生第三档"].includes(String(name))
     )
   );

@@ -162,3 +162,37 @@ def test_g1_score_discount_is_exclusive_with_excellent_tiers():
         assert "不能同时选择" in text
         assert "优秀生第一档" in text
         assert "考分优惠" in text
+
+
+def test_g1_referral_discount_amount_varies_by_strategy(monkeypatch):
+    monkeypatch.setattr("app.pricing_engine._get_name_and_info_from_student_id", lambda _sid: "测试老生")
+
+    cases = [
+        ("高新领军1", 800),
+        ("高新二期领军5", 600),
+        ("高新领军2", 400),
+    ]
+
+    for class_subject, expected in cases:
+        req = _base_req(
+            grade="新高一暑",
+            class_mode="线下",
+            class_subjects=[class_subject],
+            discounts=[DiscountItem(name="老带新", amount=0, history_student_id=1)],
+        )
+        quote = build_quote(req, now=datetime.fromisoformat("2026-07-01T10:00:00"))
+        assert quote.discount_info.get("老带新") == expected
+
+
+def test_g1_referral_legacy_name_maps_to_unified_discount(monkeypatch):
+    monkeypatch.setattr("app.pricing_engine._get_name_and_info_from_student_id", lambda _sid: "测试老生")
+
+    req = _base_req(
+        grade="新高一暑",
+        class_mode="线下",
+        class_subjects=["高新领军1"],
+        discounts=[DiscountItem(name="老带新28天", amount=0, history_student_id=1)],
+    )
+    quote = build_quote(req, now=datetime.fromisoformat("2026-07-01T10:00:00"))
+    assert quote.discount_info.get("老带新") == 800
+    assert "老带新28天" not in quote.discount_info

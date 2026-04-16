@@ -52,18 +52,38 @@
         "pricing_strategy": "lingjun24"
       },
       {
-        "name": "中原领军1 (无语英)",
-        "pricing_strategy": "lingjun24nocnen"
+        "name": "中原领军3",
+        "pricing_strategy": "lingjun24"
       }
     ],
     [
       {
-        "name": "中原领军3",
-        "pricing_strategy": "lingjun24"
+        "name": "中原领军1 (无语英)",
+        "pricing_strategy": "lingjun24minus1"
       },
       {
         "name": "中原领军3 (无语英)",
-        "pricing_strategy": "lingjun24nocnen"
+        "pricing_strategy": "lingjun24minus1"
+      }
+    ],
+    [
+      {
+        "name": "中原领军1 (无化)",
+        "pricing_strategy": "lingjun24minus1"
+      },
+      {
+        "name": "中原领军3 (无化)",
+        "pricing_strategy": "lingjun24minus1"
+      }
+    ],
+    [
+      {
+        "name": "中原领军1 (无语英化)",
+        "pricing_strategy": "lingjun24minus2"
+      },
+      {
+        "name": "中原领军3 (无语英化)",
+        "pricing_strategy": "lingjun24minus2"
       }
     ]
   ],
@@ -82,12 +102,6 @@
   },
   "discount_presets": {
     "core_common": [
-      {
-        "name": "老带新",
-        "enabled": true,
-        "strategy": "fixed_amount",
-        "value": 400
-      },
       {
         "name": "优秀生第一档",
         "enabled": true,
@@ -132,12 +146,44 @@
         }
       }
     ],
-    "moment_300": [
+    "laodaixin_28": [
+      {
+        "name": "老带新",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 800
+      }
+    ],
+    "laodaixin_24": [
+      {
+        "name": "老带新",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 600
+      }
+    ],
+    "laodaixin_21": [
+      {
+        "name": "老带新",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 400
+      }
+    ],
+    "moment_600": [
       {
         "name": "转发朋友圈",
         "enabled": true,
         "strategy": "fixed_amount",
-        "value": 300
+        "value": 600
+      }
+    ],
+    "moment_450": [
+      {
+        "name": "转发朋友圈",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 450
       }
     ],
     "moment_400": [
@@ -146,6 +192,22 @@
         "enabled": true,
         "strategy": "fixed_amount",
         "value": 400
+      }
+    ],
+    "moment_300": [
+      {
+        "name": "转发朋友圈",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 300
+      }
+    ],
+    "moment_200": [
+      {
+        "name": "转发朋友圈",
+        "enabled": true,
+        "strategy": "fixed_amount",
+        "value": 200
       }
     ],
     "early_bird_200_100": [
@@ -227,7 +289,8 @@
       "online_equation": "240*28*2 (数学物理) + 160*28 (化学)",
       "discount_preset_refs": [
         "core_common",
-        "moment_300",
+        "laodaixin_28",
+        "moment_450",
         "early_bird_300_150"
       ],
       "available_discounts_overrides": []
@@ -240,7 +303,8 @@
       "online_equation": "160*4*28",
       "discount_preset_refs": [
         "core_common",
-        "moment_400",
+        "laodaixin_28",
+        "moment_600",
         "early_bird_400_200"
       ],
       "available_discounts_overrides": []
@@ -253,6 +317,7 @@
       "online_equation": "160*4*21",
       "discount_preset_refs": [
         "core_common",
+        "laodaixin_21",
         "moment_400",
         "early_bird_200_100"
       ],
@@ -266,12 +331,13 @@
       "online_equation": "160*4*24",
       "discount_preset_refs": [
         "core_common",
+        "laodaixin_24",
         "moment_400",
         "early_bird_400_200"
       ],
       "available_discounts_overrides": []
     },
-    "lingjun24nocnen": {
+    "lingjun24minus1": {
       "price_type": "fixed_total_by_mode",
       "offline_total": 12960,
       "online_total": 11520,
@@ -279,8 +345,23 @@
       "online_equation": "160*3*24",
       "discount_preset_refs": [
         "core_common",
+        "laodaixin_24",
         "moment_300",
         "early_bird_300_150"
+      ],
+      "available_discounts_overrides": []
+    },
+    "lingjun24minus2": {
+      "price_type": "fixed_total_by_mode",
+      "offline_total": 8640,
+      "online_total": 7680,
+      "offline_equation": "180*2*24",
+      "online_equation": "160*2*24",
+      "discount_preset_refs": [
+        "core_common",
+        "laodaixin_24",
+        "moment_200",
+        "early_bird_200_100"
       ],
       "available_discounts_overrides": []
     }
@@ -362,8 +443,12 @@
       "五一报名优惠会根据历史缴费记录自动计算"
     ],
     "discount_labels": {
-      "老带新": "老带新",
-      "转发朋友圈": "转发朋友圈"
+      "老带新": "老带新"
+    },
+    "discount_aliases": {
+      "老带新28天": "老带新",
+      "老带新24天": "老带新",
+      "老带新21天": "老带新"
     }
   }
 }

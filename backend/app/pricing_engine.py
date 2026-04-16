@@ -11,7 +11,7 @@ from .class_subject_meta import GRADE_CLASS_SUBJECT_OPTIONS
 from .constants import NON_EARLY_BIRD_VALID_UNTIL
 from .core.datetime_utils import utcnow_naive
 from .rules_loader import get_grade_rule
-from .schemas import QuoteCalculateRequest, QuoteResult
+from .schemas import DiscountItem, QuoteCalculateRequest, QuoteResult
 
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
@@ -48,6 +48,61 @@ def _discount_meta_map(grade: str) -> dict[str, dict]:
             continue
         mapping[name] = item
     return mapping
+
+
+def _discount_alias_map(grade: str) -> dict[str, str]:
+    ui_hints = _rule(grade).get("ui_hints", {})
+    aliases = ui_hints.get("discount_aliases", {}) if isinstance(ui_hints, dict) else {}
+    mapping: dict[str, str] = {}
+    if not isinstance(aliases, dict):
+        return mapping
+    for alias, canonical in aliases.items():
+        alias_name = str(alias).strip()
+        canonical_name = str(canonical).strip()
+        if alias_name and canonical_name:
+            mapping[alias_name] = canonical_name
+    return mapping
+
+
+def _normalize_discount_name(grade: str, name: str) -> str:
+    trimmed = str(name or "").strip()
+    if not trimmed:
+        return ""
+
+    alias_map = _discount_alias_map(grade)
+    if trimmed in alias_map:
+        return alias_map[trimmed]
+
+    # Legacy fallback for referral discount names like "老带新28天".
+    if trimmed.startswith("老带新") and "老带新" in _discount_meta_map(grade):
+        return "老带新"
+
+    return trimmed
+
+
+def _normalize_request_discounts(req: QuoteCalculateRequest) -> None:
+    merged: dict[str, DiscountItem] = {}
+    for item in req.discounts:
+        normalized_name = _normalize_discount_name(req.grade, item.name)
+        if not normalized_name:
+            continue
+        existing = merged.get(normalized_name)
+        if existing is None:
+            merged[normalized_name] = DiscountItem(
+                name=normalized_name,
+                amount=float(item.amount),
+                history_student_id=item.history_student_id,
+                note=item.note,
+            )
+            continue
+
+        # Keep a stable merged payload when aliases map to the same canonical discount.
+        if existing.history_student_id is None and item.history_student_id:
+            existing.history_student_id = item.history_student_id
+        if float(item.amount) > float(existing.amount):
+            existing.amount = float(item.amount)
+
+    req.discounts = list(merged.values())
 
 
 def _subject_strategy_map(grade: str) -> dict[str, str]:
@@ -226,6 +281,7 @@ def _subject_mode(req: QuoteCalculateRequest, subject: str) -> str:
 
 
 def _validate_request(req: QuoteCalculateRequest) -> None:
+    _normalize_request_discounts(req)
     _validate_class_subjects(req.grade, req.class_subjects)
     rule = _rule(req.grade)
 
@@ -464,7 +520,7 @@ def _calc_discounts(req: QuoteCalculateRequest, now: datetime) -> tuple[float, d
         if req.grade == "初中/小学暑期":
             non_price_benefits.append("课程结束后，每科满勤返现100元。21天课程不发放全勤奖。")
         elif req.grade == "新高一暑":
-            non_price_benefits.append("课程结束后，每科满勤返现（语文+英语视为1科）100元。21天课程不发放全勤奖。")
+            non_price_benefits.append("课程结束后，全科全勤则返现300元。（全勤奖返现不含21天课程）")
         else:
             non_price_benefits.append("课程结束后，每科满勤返现100元。")
 
