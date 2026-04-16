@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import desc, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
-from app.constants import STATUS_PAID, STATUS_QUOTED
+from app.constants import ENROLLMENT_STATS_INCLUDED_STATUSES, STATUS_PAID, STATUS_QUOTED
 from app.core.datetime_utils import utcnow_naive
 from app.errors import raise_biz_error
 from app.models import Enrollment, Student, StudentHistory
@@ -64,6 +64,102 @@ def _ensure_student_history_after_payment(db: Session, enrollment: Enrollment) -
         )
     )
     db.flush()
+
+
+def _bucket_subject_modes(enrollment: Enrollment) -> tuple[set[str], set[str]]:
+    subjects = {
+        str(subject).strip()
+        for subject in (enrollment.class_subjects or [])
+        if str(subject).strip()
+    }
+    if not subjects:
+        return set(), set()
+
+    mode = (enrollment.class_mode or "").strip()
+    if mode == "线下":
+        return subjects, set()
+    if mode == "线上":
+        return set(), subjects
+
+    details = enrollment.mode_details if isinstance(enrollment.mode_details, dict) else {}
+    offline_subjects = {
+        str(subject).strip()
+        for subject in details.get("offline_subjects", [])
+        if str(subject).strip()
+    }
+    online_subjects = {
+        str(subject).strip()
+        for subject in details.get("online_subjects", [])
+        if str(subject).strip()
+    }
+    offline_subjects &= subjects
+    online_subjects &= subjects
+
+    missing = subjects - offline_subjects - online_subjects
+    if missing:
+        # 混合上课方式下兜底按线上统计，避免丢失科目计数。
+        online_subjects |= missing
+
+    return offline_subjects, online_subjects
+
+
+def get_enrollment_stats(db: Session) -> dict[str, Any]:
+    child = aliased(Enrollment)
+    has_newer = exists(select(1).where(child.previous_enrollment_id == Enrollment.id))
+    rows = db.scalars(
+        select(Enrollment).where(
+            Enrollment.valid.is_(True),
+            Enrollment.status.in_(ENROLLMENT_STATS_INCLUDED_STATUSES),
+            ~has_newer,
+        )
+    ).all()
+
+    counter: dict[tuple[str, str], dict[str, int]] = {}
+    total_units = 0
+    total_offline = 0
+    total_online = 0
+
+    for enrollment in rows:
+        grade = (enrollment.grade or "").strip() or "-"
+        offline_subjects, online_subjects = _bucket_subject_modes(enrollment)
+
+        for subject in sorted(offline_subjects):
+            key = (grade, subject)
+            bucket = counter.setdefault(key, {"offline_count": 0, "online_count": 0})
+            bucket["offline_count"] += 1
+            total_units += 1
+            total_offline += 1
+
+        for subject in sorted(online_subjects):
+            key = (grade, subject)
+            bucket = counter.setdefault(key, {"offline_count": 0, "online_count": 0})
+            bucket["online_count"] += 1
+            total_units += 1
+            total_online += 1
+
+    stats_rows = []
+    for (grade, subject), item in sorted(counter.items(), key=lambda entry: (entry[0][0], entry[0][1])):
+        offline_count = int(item["offline_count"])
+        online_count = int(item["online_count"])
+        stats_rows.append(
+            {
+                "grade": grade,
+                "subject": subject,
+                "offline_count": offline_count,
+                "online_count": online_count,
+                "total_count": offline_count + online_count,
+            }
+        )
+
+    return {
+        "rows": stats_rows,
+        "summary": {
+            "total_rows": len(rows),
+            "total_enrollment_subject_units": total_units,
+            "total_offline": total_offline,
+            "total_online": total_online,
+        },
+    }
 
 
 def create_enrollment(db: Session, payload: EnrollmentCreateRequest) -> dict[str, Any]:
