@@ -240,10 +240,162 @@ function setAutoDiscountChecked(discountName, checked) {
 function renderDiscountNotes(conf, extraMessage = "") {
   const tips = (conf?.notes || []).concat(conf?.autoNotes || []);
   if (extraMessage) {
-    discountNote.innerHTML = `<div>${extraMessage}</div>`;
-    return;
+    tips.push(extraMessage);
   }
   discountNote.innerHTML = tips.length ? `<div>${tips.join(" ")}</div>` : "";
+}
+
+function buildSubjectStrategyMap(rule) {
+  const mapping = new Map();
+  const groups = Array.isArray(rule?.class_subject_groups) ? rule.class_subject_groups : [];
+  groups.forEach((group) => {
+    if (!Array.isArray(group)) return;
+    group.forEach((item) => {
+      if (typeof item === "string") {
+        const name = item.trim();
+        if (name) {
+          mapping.set(name, "default");
+        }
+        return;
+      }
+      if (!item || typeof item !== "object") return;
+      const name = String(item.name || "").trim();
+      const strategy = String(item.pricing_strategy || "default").trim() || "default";
+      if (name) {
+        mapping.set(name, strategy);
+      }
+    });
+  });
+  return mapping;
+}
+
+function mergeDiscountCfg(base, override) {
+  const merged = { ...(base || {}) };
+  Object.entries(override || {}).forEach(([key, value]) => {
+    if (key === "rule" && value && typeof value === "object" && merged.rule && typeof merged.rule === "object") {
+      merged.rule = { ...merged.rule, ...value };
+      return;
+    }
+    merged[key] = value;
+  });
+  return merged;
+}
+
+function strategyDiscountMap(rule, strategy) {
+  const presets = rule?.discount_presets;
+  const pricing = rule?.pricing;
+  if (!pricing || typeof pricing !== "object") {
+    return new Map();
+  }
+  const pricingCfg = pricing[strategy] && typeof pricing[strategy] === "object" ? pricing[strategy] : {};
+  const mapping = new Map();
+
+  const refs = Array.isArray(pricingCfg.discount_preset_refs) ? pricingCfg.discount_preset_refs : [];
+  refs.forEach((ref) => {
+    const presetItems = presets && typeof presets === "object" ? presets[ref] : null;
+    if (!Array.isArray(presetItems)) return;
+    presetItems.forEach((item) => {
+      if (!item || typeof item !== "object") return;
+      const name = String(item.name || "").trim();
+      if (!name) return;
+      mapping.set(name, item);
+    });
+  });
+
+  let overrides = pricingCfg.available_discounts_overrides;
+  if (overrides && typeof overrides === "object" && !Array.isArray(overrides)) {
+    overrides = Object.entries(overrides).map(([name, conf]) => ({ name, ...(conf || {}) }));
+  }
+
+  if (Array.isArray(overrides)) {
+    overrides.forEach((override) => {
+      if (!override || typeof override !== "object") return;
+      const name = String(override.name || "").trim();
+      if (!name) return;
+      const base = mapping.get(name) || { name };
+      mapping.set(name, mergeDiscountCfg(base, override));
+    });
+  }
+
+  return mapping;
+}
+
+function enabledDiscountSetForSubjects(rule, classSubjects) {
+  const chosen = Array.isArray(classSubjects) ? classSubjects : [];
+  if (chosen.length === 0) {
+    return null;
+  }
+
+  const strategyBySubject = buildSubjectStrategyMap(rule);
+  const enabled = new Set();
+  chosen.forEach((subject) => {
+    const strategy = strategyBySubject.get(subject) || "default";
+    const discountMap = strategyDiscountMap(rule, strategy);
+    discountMap.forEach((cfg, name) => {
+      if (!cfg || typeof cfg !== "object") return;
+      if (cfg.enabled === false) return;
+      enabled.add(name);
+    });
+  });
+  return enabled;
+}
+
+async function syncDiscountAvailability(conf) {
+  if (!conf) {
+    return;
+  }
+
+  const selectedSubjects = selectedClassSubjects();
+  if (selectedSubjects.length === 0) {
+    discountWrap.querySelectorAll("input[name='discount']").forEach((input) => {
+      if (input.value === "考分优惠") {
+        return;
+      }
+      if (input.getAttribute("data-discount-mode") === "manual") {
+        input.disabled = false;
+        input.closest(".choice-item")?.classList.remove("disabled");
+      }
+    });
+    renderDiscountNotes(conf);
+    return;
+  }
+
+  const rule = await loadGradeRule(conf.grade);
+  const enabledNames = enabledDiscountSetForSubjects(rule, selectedSubjects) || new Set();
+  const unavailableNames = [];
+
+  discountWrap.querySelectorAll("input[name='discount']").forEach((input) => {
+    const discountName = String(input.value || "").trim();
+    if (!discountName || discountName === "考分优惠") {
+      return;
+    }
+    const available = enabledNames.has(discountName);
+    if (!available) {
+      unavailableNames.push(discountName);
+      if (input.checked) {
+        input.checked = false;
+        input.setAttribute("data-last-checked", "false");
+        if (input.getAttribute("data-discount-mode") === "auto") {
+          autoDiscountCheckedNames.delete(discountName);
+        }
+      }
+      input.disabled = true;
+      input.closest(".choice-item")?.classList.add("disabled");
+      return;
+    }
+
+    if (input.getAttribute("data-discount-mode") === "manual") {
+      input.disabled = false;
+      input.closest(".choice-item")?.classList.remove("disabled");
+    }
+  });
+
+  refreshHistoryArea();
+  if (unavailableNames.length > 0) {
+    renderDiscountNotes(conf, `当前所选科目不支持: ${unavailableNames.join("、")}`);
+    return;
+  }
+  renderDiscountNotes(conf);
 }
 
 function resetIdentityOnGradeSwitch() {
@@ -420,6 +572,7 @@ async function refreshAutoDiscountsByIdentity() {
     clearAutoDiscountSelectionState();
     setAutoDiscountInputsDisabled(true);
     renderDiscountNotes(conf);
+    await syncDiscountAvailability(conf);
     return;
   }
 
@@ -450,13 +603,14 @@ async function refreshAutoDiscountsByIdentity() {
     }
     setAutoDiscountInputsDisabled(false);
     refreshHistoryArea();
-    renderDiscountNotes(conf);
+    await syncDiscountAvailability(conf);
   } catch (error) {
     if (seq !== autoDiscountRequestSeq) {
       return;
     }
     clearAutoDiscountSelectionState();
     setAutoDiscountInputsDisabled(false);
+    await syncDiscountAvailability(conf);
     renderDiscountNotes(conf, `自动优惠检查失败：${error.message}`);
   }
 }
@@ -644,12 +798,16 @@ function renderActiveGradeForm() {
   }
 
   renderDiscountNotes(conf);
+  void syncDiscountAvailability(conf);
 
   refreshHistoryArea();
   refreshMixedModeRows();
 
   classSubjectWrap.querySelectorAll("input[name='classSubject']").forEach((item) => {
-    item.addEventListener("change", refreshMixedModeRows);
+    item.addEventListener("change", () => {
+      refreshMixedModeRows();
+      void syncDiscountAvailability(conf);
+    });
   });
   classModeWrap.querySelectorAll("input[name='classMode']").forEach((item) => {
     item.addEventListener("change", refreshMixedModeRows);

@@ -154,6 +154,29 @@
         "value": 100
       },
       {
+        "name": "早鸟",
+        "enabled": true,
+        "strategy": "per_subject_amount",
+        "params": {
+          "stages": [
+            {
+              "name": "第一阶段",
+              "time_start": "2026-03-01T00:00:00",
+              "time_end": "2026-05-15T23:59:59",
+              "value": 100
+            },
+            {
+              "name": "第二阶段",
+              "time_start": "2026-05-16T00:00:00",
+              "time_end": "2026-06-15T23:59:59",
+              "value": 50
+            }
+          ]
+        }
+      }
+    ],
+    "cash_discount": [
+      {
         "name": "现金优惠",
         "enabled": true,
         "strategy": "per_subject_amount",
@@ -167,7 +190,8 @@
       "offline_per_subject": 5040,
       "online_per_subject": 4480,
       "discount_preset_refs": [
-        "cz_core"
+        "cz_core",
+        "cash_discount"
       ],
       "available_discounts_overrides": []
     },
@@ -185,7 +209,8 @@
       "offline_per_subject": 7560,
       "online_per_subject": 6720,
       "discount_preset_refs": [
-        "cz_core"
+        "cz_core",
+        "cash_discount"
       ],
       "available_discounts_overrides": []
     },
@@ -194,7 +219,8 @@
       "offline_per_subject": 5040,
       "online_per_subject": 4480,
       "discount_preset_refs": [
-        "cz_core"
+        "cz_core",
+        "cash_discount"
       ],
       "available_discounts_overrides": []
     }
@@ -223,27 +249,33 @@
       "mode": "auto"
     },
     {
-      "name": "现金优惠",
+      "name": "早鸟",
       "requires_history_student": false,
       "exclusive_with": [],
-      "mode": "manual"
+      "mode": "auto"
     }
   ],
   "quote_validity": {
-    "strategy": "fixed",
+    "strategy": "follow_early_bird_stage_or_fixed",
     "params": {
-      "fixed_until": "2026-12-31T23:59:59"
+      "fixed_until": "2026-12-31T23:59:59",
+      "fallback_minutes": 30,
+      "early_bird_stage_ends": [
+        "2026-05-15T23:59:59",
+        "2026-06-15T23:59:59"
+      ]
     }
   },
   "ui_hints": {
     "notes": [
+      "早鸟优惠会按系统时间自动生效",
       "全勤奖提示: 28天课程每科结课后可返100元"
     ],
     "discount_labels": {
       "老带新": "老带新",
       "转发朋友圈": "转发朋友圈",
       "老生续报": "老生续报",
-      "现金优惠": "现金优惠"
+      "早鸟": "早鸟"
     }
   }
 }

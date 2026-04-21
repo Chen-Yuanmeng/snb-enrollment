@@ -86,6 +86,7 @@ let gradeRules = [];
 let currentSearchRows = [];
 let autofilledReferralHistoryStudentId = 0;
 let isDirty = false;
+const gradeRuleDetailCache = new Map();
 
 function markDirty() {
   isDirty = true;
@@ -133,6 +134,16 @@ async function fetchJson(url, options = {}) {
     throw new Error(detail || data.message || "请求失败");
   }
   return data;
+}
+
+async function loadGradeRule(grade) {
+  if (gradeRuleDetailCache.has(grade)) {
+    return gradeRuleDetailCache.get(grade);
+  }
+  const result = await fetchJson(`${API_BASE}/rules/grade/${encodeURIComponent(grade)}`);
+  const rule = result.data || {};
+  gradeRuleDetailCache.set(grade, rule);
+  return rule;
 }
 
 async function copyText(text) {
@@ -261,6 +272,152 @@ function renderDiscountNotes(rule) {
   discountNote.textContent = notes.length ? notes.join(" ") : "";
 }
 
+function buildSubjectStrategyMap(rule) {
+  const mapping = new Map();
+  const groups = Array.isArray(rule?.class_subject_groups) ? rule.class_subject_groups : [];
+  groups.forEach((group) => {
+    if (!Array.isArray(group)) return;
+    group.forEach((item) => {
+      if (typeof item === "string") {
+        const name = item.trim();
+        if (name) {
+          mapping.set(name, "default");
+        }
+        return;
+      }
+      if (!item || typeof item !== "object") return;
+      const name = String(item.name || "").trim();
+      const strategy = String(item.pricing_strategy || "default").trim() || "default";
+      if (name) {
+        mapping.set(name, strategy);
+      }
+    });
+  });
+  return mapping;
+}
+
+function mergeDiscountCfg(base, override) {
+  const merged = { ...(base || {}) };
+  Object.entries(override || {}).forEach(([key, value]) => {
+    if (key === "rule" && value && typeof value === "object" && merged.rule && typeof merged.rule === "object") {
+      merged.rule = { ...merged.rule, ...value };
+      return;
+    }
+    merged[key] = value;
+  });
+  return merged;
+}
+
+function strategyDiscountMap(rule, strategy) {
+  const presets = rule?.discount_presets;
+  const pricing = rule?.pricing;
+  if (!pricing || typeof pricing !== "object") {
+    return new Map();
+  }
+
+  const pricingCfg = pricing[strategy] && typeof pricing[strategy] === "object" ? pricing[strategy] : {};
+  const mapping = new Map();
+
+  const refs = Array.isArray(pricingCfg.discount_preset_refs) ? pricingCfg.discount_preset_refs : [];
+  refs.forEach((ref) => {
+    const presetItems = presets && typeof presets === "object" ? presets[ref] : null;
+    if (!Array.isArray(presetItems)) return;
+    presetItems.forEach((item) => {
+      if (!item || typeof item !== "object") return;
+      const name = String(item.name || "").trim();
+      if (!name) return;
+      mapping.set(name, item);
+    });
+  });
+
+  let overrides = pricingCfg.available_discounts_overrides;
+  if (overrides && typeof overrides === "object" && !Array.isArray(overrides)) {
+    overrides = Object.entries(overrides).map(([name, conf]) => ({ name, ...(conf || {}) }));
+  }
+
+  if (Array.isArray(overrides)) {
+    overrides.forEach((override) => {
+      if (!override || typeof override !== "object") return;
+      const name = String(override.name || "").trim();
+      if (!name) return;
+      const base = mapping.get(name) || { name };
+      mapping.set(name, mergeDiscountCfg(base, override));
+    });
+  }
+  return mapping;
+}
+
+function enabledDiscountSetForSubjects(rule, classSubjects) {
+  const chosen = Array.isArray(classSubjects) ? classSubjects : [];
+  if (chosen.length === 0) {
+    return null;
+  }
+
+  const strategyBySubject = buildSubjectStrategyMap(rule);
+  const enabled = new Set();
+  chosen.forEach((subject) => {
+    const strategy = strategyBySubject.get(subject) || "default";
+    const discountMap = strategyDiscountMap(rule, strategy);
+    discountMap.forEach((cfg, name) => {
+      if (!cfg || typeof cfg !== "object") return;
+      if (cfg.enabled === false) return;
+      enabled.add(name);
+    });
+  });
+  return enabled;
+}
+
+async function syncDiscountAvailability() {
+  const ruleMeta = currentRule();
+  const grade = newGradeSelect.value;
+  if (!ruleMeta || !grade) {
+    return;
+  }
+
+  const selectedSubjects = selectedClassSubjects();
+  if (selectedSubjects.length === 0) {
+    newDiscountWrap.querySelectorAll("input[name='refundDiscount']").forEach((input) => {
+      if (input.value === "考分优惠") {
+        return;
+      }
+      input.disabled = false;
+      input.closest(".choice-item")?.classList.remove("disabled");
+    });
+    renderDiscountNotes(ruleMeta);
+    return;
+  }
+
+  const rule = await loadGradeRule(grade);
+  const enabledNames = enabledDiscountSetForSubjects(rule, selectedSubjects) || new Set();
+  const unavailableNames = [];
+
+  newDiscountWrap.querySelectorAll("input[name='refundDiscount']").forEach((input) => {
+    const discountName = String(input.value || "").trim();
+    if (!discountName || discountName === "考分优惠") {
+      return;
+    }
+
+    const available = enabledNames.has(discountName);
+    if (!available) {
+      unavailableNames.push(discountName);
+      input.checked = false;
+      input.disabled = true;
+      input.closest(".choice-item")?.classList.add("disabled");
+      return;
+    }
+
+    input.disabled = false;
+    input.closest(".choice-item")?.classList.remove("disabled");
+  });
+
+  refreshHistoryArea();
+  const notes = Array.isArray(ruleMeta?.notes) ? [...ruleMeta.notes] : [];
+  if (unavailableNames.length > 0) {
+    notes.push(`当前所选科目不支持: ${unavailableNames.join("、")}`);
+  }
+  discountNote.textContent = notes.join(" ");
+}
+
 function refreshHistoryArea() {
   const needHistory = selectedDiscounts().includes("老带新");
   historyWrap.classList.toggle("hidden", !needHistory);
@@ -360,7 +517,10 @@ function renderClassSubjectGroups(rule) {
     .join("");
 
   newClassSubjectWrap.querySelectorAll("input[name='refundClassSubject']").forEach((item) => {
-    item.addEventListener("change", refreshMixedModeRows);
+    item.addEventListener("change", () => {
+      refreshMixedModeRows();
+      void syncDiscountAvailability();
+    });
   });
 }
 
@@ -427,6 +587,7 @@ function renderDiscounts(rule) {
   });
   renderDiscountNotes(rule);
   refreshHistoryArea();
+  void syncDiscountAvailability();
 }
 
 function renderGradeRule() {
@@ -493,6 +654,7 @@ function applyEnrollmentToForm(row) {
   }
   applyClassSubjectsByValues(classSubjects);
   applyDiscountsByNames(discountNames);
+  void syncDiscountAvailability();
   const excellentPicked = snapshotDiscounts.find((item) => ["优秀生第一档", "优秀生第二档", "优秀生第三档"].includes(String(item?.name || "")));
   if (excellentPicked) {
     const excellentInput = document.querySelector(

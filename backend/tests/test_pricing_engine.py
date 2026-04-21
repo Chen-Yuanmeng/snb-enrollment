@@ -196,3 +196,28 @@ def test_g1_referral_legacy_name_maps_to_unified_discount(monkeypatch):
     quote = build_quote(req, now=datetime.fromisoformat("2026-07-01T10:00:00"))
     assert quote.discount_info.get("老带新") == 800
     assert "老带新28天" not in quote.discount_info
+
+
+def test_junior_primary_summer_auto_early_bird_stage2_value():
+    req = _base_req(
+        grade="初中/小学暑期",
+        class_mode="线下",
+        class_subjects=["新九数学"],
+        discounts=[],
+    )
+    quote = build_quote(req, now=datetime.fromisoformat("2026-05-20T12:00:00"))
+    assert quote.discount_info.get("早鸟") == 50
+
+
+def test_junior_primary_summer_cash_discount_not_allowed_for_cz21_subjects():
+    req = _base_req(
+        grade="初中/小学暑期",
+        class_mode="线下",
+        class_subjects=["新七数学"],
+        discounts=[DiscountItem(name="现金优惠", amount=100)],
+    )
+    try:
+        build_quote(req)
+        assert False, "should raise"
+    except ValueError as exc:
+        assert "当前班型不支持现金优惠" in str(exc)

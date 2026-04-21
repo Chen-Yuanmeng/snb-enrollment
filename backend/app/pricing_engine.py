@@ -298,7 +298,7 @@ def _validate_request(req: QuoteCalculateRequest) -> None:
     }
 
     for name in discount_names:
-        if name not in enabled_discount_names:
+        if name not in enabled_discount_names and not _grade_supports_discount(req.grade, name):
             raise ValueError(f"当前年级不支持{name}")
 
     for name in discount_names:
@@ -317,11 +317,12 @@ def _validate_request(req: QuoteCalculateRequest) -> None:
     if req.grade not in _early_bird_grades() and any("早鸟" in name for name in discount_names):
         raise ValueError("该年级不支持早鸟优惠")
 
+    def _subject_supports_discount(subject: str, discount_name: str) -> bool:
+        cfg = _discount_cfg_for_subject(req.grade, subject).get(discount_name)
+        return isinstance(cfg, dict) and cfg.get("enabled", True)
+
     for name in discount_names:
-        if any(
-            _discount_cfg_for_subject(req.grade, subject).get(name, {}).get("enabled", True)
-            for subject in req.class_subjects
-        ):
+        if any(_subject_supports_discount(subject, name) for subject in req.class_subjects):
             continue
         raise ValueError(f"当前班型不支持{name}")
 
@@ -403,12 +404,12 @@ def _stage_value(stages: list[dict], now: datetime) -> float | None:
         end = None
         if isinstance(raw_start, str):
             try:
-                start = datetime.fromisoformat(raw_start)
+                start = _parse_beijing_local_iso_to_utc_naive(raw_start)
             except ValueError:
                 start = None
         if isinstance(raw_end, str):
             try:
-                end = datetime.fromisoformat(raw_end)
+                end = _parse_beijing_local_iso_to_utc_naive(raw_end)
             except ValueError:
                 end = None
 
@@ -429,8 +430,14 @@ def _stage_value(stages: list[dict], now: datetime) -> float | None:
 def _discount_amount_from_cfg(name: str, cfg: dict, raw_amount: float, now: datetime) -> float:
     strategy = str(cfg.get("strategy", ""))
     params = cfg.get("params", {}) if isinstance(cfg.get("params", {}), dict) else {}
+    staged_values = params.get("stages", [])
 
     if strategy in {"fixed_amount", "per_subject_amount"}:
+        if isinstance(staged_values, list) and staged_values:
+            value = _stage_value(staged_values, now)
+            if value is None:
+                raise ValueError("当前时间不在早鸟优惠窗口")
+            return value
         if "value" in cfg:
             return float(cfg.get("value", 0))
         return float(params.get("value", 0))

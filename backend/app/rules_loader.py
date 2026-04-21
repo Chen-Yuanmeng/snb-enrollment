@@ -121,6 +121,69 @@ def get_rules_meta_payload(sources: list[str], status: dict[str, str]) -> dict[s
             "exclusive_with": exclusive_with,
         }
 
+    def _pricing_discount_names(rule: dict[str, Any]) -> set[str]:
+        presets = rule.get("discount_presets", {}) if isinstance(rule, dict) else {}
+        pricing = rule.get("pricing", {}) if isinstance(rule, dict) else {}
+        names: set[str] = set()
+        if not isinstance(presets, dict) or not isinstance(pricing, dict):
+            return names
+
+        for cfg in pricing.values():
+            if not isinstance(cfg, dict):
+                continue
+
+            refs = cfg.get("discount_preset_refs", [])
+            if isinstance(refs, list):
+                for ref in refs:
+                    preset_items = presets.get(ref, [])
+                    if not isinstance(preset_items, list):
+                        continue
+                    for item in preset_items:
+                        if not isinstance(item, dict):
+                            continue
+                        name = str(item.get("name", "")).strip()
+                        if name and item.get("enabled", True):
+                            names.add(name)
+
+            overrides = cfg.get("available_discounts_overrides", [])
+            if isinstance(overrides, dict):
+                iterable = [{"name": k, **v} for k, v in overrides.items() if isinstance(v, dict)]
+            elif isinstance(overrides, list):
+                iterable = [item for item in overrides if isinstance(item, dict)]
+            else:
+                iterable = []
+
+            for item in iterable:
+                name = str(item.get("name", "")).strip()
+                if not name:
+                    continue
+                if item.get("enabled", True):
+                    names.add(name)
+                elif name in names:
+                    names.remove(name)
+
+        return names
+
+    def _grade_discounts_meta(grade: str) -> list[dict[str, Any]]:
+        rule = get_grade_rule(grade) or {}
+        explicit_meta = {
+            str(item.get("name", "")).strip(): _normalize_discount_meta(item)
+            for item in rule.get("discounts", [])
+            if isinstance(item, dict) and item.get("enabled", True) and item.get("name")
+        }
+
+        for name in sorted(_pricing_discount_names(rule)):
+            if name in explicit_meta:
+                continue
+            explicit_meta[name] = {
+                "name": name,
+                "mode": "manual",
+                "requires_history_student": False,
+                "exclusive_with": [],
+            }
+
+        return list(explicit_meta.values())
+
     return {
         "version": index.get("version", "unknown"),
         "timezone": index.get("timezone", "Asia/Shanghai"),
@@ -131,9 +194,9 @@ def get_rules_meta_payload(sources: list[str], status: dict[str, str]) -> dict[s
                 "class_modes": modes.get(grade, []),
                 "class_subject_groups": groups.get(grade, []),
                 "discounts": [
-                    _normalize_discount_meta(d)
-                    for d in (get_grade_rule(grade) or {}).get("discounts", [])
-                    if isinstance(d, dict) and d.get("enabled", True) and d.get("name")
+                    item
+                    for item in _grade_discounts_meta(grade)
+                    if item.get("name")
                 ],
                 "selection_mode": ((get_grade_rule(grade) or {}).get("constraints", {}) or {}).get(
                     "selection_mode", "multiple"
