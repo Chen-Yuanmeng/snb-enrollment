@@ -31,16 +31,6 @@
         "name": "高新 物理",
         "pricing_strategy": "default"
       }
-    ],
-    [
-      {
-        "name": "中原 道德与法治",
-        "pricing_strategy": "default"
-      },
-      {
-        "name": "中原 历史",
-        "pricing_strategy": "default"
-      }
     ]
   ],
   "constraints": {
