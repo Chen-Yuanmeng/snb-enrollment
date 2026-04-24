@@ -12,11 +12,11 @@
     [
       {
         "name": "英才数学",
-        "pricing_strategy": "default"
+        "pricing_strategy": "g2_21"
       },
       {
         "name": "英才物理",
-        "pricing_strategy": "default"
+        "pricing_strategy": "g2_21"
       },
       {
         "name": "英才化学",
@@ -162,6 +162,13 @@
       "discount_preset_refs": [
         "g2_core"
       ],
+      "available_discounts_overrides": []
+    },
+    "g2_21": {
+      "price_type": "per_subject_by_mode",
+      "offline_per_subject": 3780,
+      "online_per_subject": 3360,
+      "discount_preset_refs": [],
       "available_discounts_overrides": []
     }
   },
