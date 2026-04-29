@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS enrollments (
     source VARCHAR(50) NOT NULL,
     chain_root_enrollment_id BIGINT NULL REFERENCES enrollments(id),
     previous_enrollment_id BIGINT NULL REFERENCES enrollments(id),
+    paid_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     note TEXT NULL
@@ -64,6 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_fingerprint ON enrollments(quote_fing
 CREATE INDEX IF NOT EXISTS idx_enrollments_source ON enrollments(source);
 CREATE INDEX IF NOT EXISTS idx_enrollments_chain_root ON enrollments(chain_root_enrollment_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_previous ON enrollments(previous_enrollment_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_paid_at ON enrollments(paid_at);
 
 CREATE TABLE IF NOT EXISTS accommodation_enrollments (
     id BIGSERIAL PRIMARY KEY,

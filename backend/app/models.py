@@ -69,6 +69,7 @@ class Enrollment(Base):
     previous_enrollment_id: Mapped[int | None] = mapped_column(
         ForeignKey("enrollments.id"), nullable=True, index=True
     )
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     updated_at: Mapped[datetime] = mapped_column(

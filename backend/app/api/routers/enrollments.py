@@ -5,7 +5,14 @@ from app.config import config
 from app.core.validation import ensure_operator, ensure_source
 from app.database import get_db
 from app.services import enrollment_service
-from app.schemas import ApiResponse, BatchPayRequest, EnrollmentCreateRequest, EnrollmentOut, PayRequest
+from app.schemas import (
+    ApiResponse,
+    BatchPayRequest,
+    EnrollmentCancelRequest,
+    EnrollmentCreateRequest,
+    EnrollmentOut,
+    PayRequest,
+)
 
 router = APIRouter()
 
@@ -63,6 +70,14 @@ def pay_enrollment(enrollment_id: int, payload: PayRequest, db: Session = Depend
     ensure_operator(payload.operator_name)
     ensure_source(payload.source)
     data = enrollment_service.pay_enrollment(db, enrollment_id, payload)
+    return ApiResponse(data=data)
+
+
+@router.post(f"{config.api_prefix}/enrollments/{{enrollment_id}}/cancel", response_model=ApiResponse)
+def cancel_enrollment(enrollment_id: int, payload: EnrollmentCancelRequest, db: Session = Depends(get_db)) -> ApiResponse:
+    ensure_operator(payload.operator_name)
+    ensure_source(payload.source)
+    data = enrollment_service.cancel_enrollment(db, enrollment_id, payload)
     return ApiResponse(data=data)
 
 

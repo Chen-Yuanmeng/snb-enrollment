@@ -48,11 +48,19 @@ const STORAGE_KEYS = {
   source: "snb.selectedSource",
 };
 
+const PAID_AT_INPUT_PATTERN = /^\d{2}\.\d{2}\s\d{4}$/;
+
 const enrollmentState = {
   page: 1,
   pageSize: 20,
   total: 0,
   isLoading: false,
+};
+
+const modalState = {
+  mode: null,
+  enrollmentId: null,
+  isSubmitting: false,
 };
 
 function readStoredValue(key) {
@@ -98,6 +106,7 @@ async function fetchJson(url, options = {}) {
 function statusText(status) {
   if (status === "unconfirmed") return "未确认";
   if (status === "confirmed") return "已确认";
+  if (status === "cancelled") return "已取消";
   if (status === "pending_adjustment") return "待调整";
   if (status === "adjusted") return "已调整";
   if (status === "increased") return "已增报";
@@ -109,18 +118,40 @@ function statusText(status) {
 function statusClass(status) {
   if (status === "unconfirmed" || status === "pending_adjustment") return "status-quoted";
   if (status === "confirmed" || status === "adjusted" || status === "increased") return "status-paid";
+  if (status === "cancelled") return "status-cancelled";
   if (status === "partial_refunded") return "status-paid";
   if (status === "refunded") return "status-refunded";
   return "";
 }
 
-function formatDateTime(value) {
-  if (!value) return "-";
+function parseDate(value) {
+  if (!value) return null;
   const raw = String(value).trim();
   const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
   const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return "-";
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function formatDateTime(value) {
+  const date = parseDate(value);
+  if (!date) return "-";
   return date.toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" });
+}
+
+function formatPaidAt(value) {
+  const date = parseDate(value);
+  if (!date) return "-";
+  const formatter = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(date).map((item) => [item.type, item.value]));
+  return `${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
 }
 
 function formatMoney(value) {
@@ -166,6 +197,195 @@ function mustOperator() {
   return true;
 }
 
+function createActionModal() {
+  const modal = document.createElement("div");
+  modal.className = "app-modal-backdrop hidden";
+  modal.innerHTML = `
+    <div class="app-modal-card" role="dialog" aria-modal="true" aria-labelledby="enrollmentActionModalTitle">
+      <div class="app-modal-header">
+        <h3 id="enrollmentActionModalTitle">报名操作</h3>
+        <button type="button" class="secondary app-modal-close" data-role="dismiss">关闭</button>
+      </div>
+      <div class="app-modal-body">
+        <p class="app-modal-text" data-role="description"></p>
+        <label class="app-modal-field" data-role="paid-at-wrap">
+          交费时间
+          <input
+            type="text"
+            data-role="paid-at-input"
+            placeholder="例如 04.29 1530"
+            inputmode="numeric"
+            autocomplete="off"
+          />
+        </label>
+        <p class="app-modal-error hidden" data-role="error"></p>
+      </div>
+      <div class="actions app-modal-actions">
+        <button type="button" class="secondary" data-role="cancel">取消</button>
+        <button type="button" data-role="confirm">确认</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  return {
+    root: modal,
+    title: modal.querySelector("#enrollmentActionModalTitle"),
+    description: modal.querySelector("[data-role='description']"),
+    paidAtWrap: modal.querySelector("[data-role='paid-at-wrap']"),
+    paidAtInput: modal.querySelector("[data-role='paid-at-input']"),
+    error: modal.querySelector("[data-role='error']"),
+    confirmBtn: modal.querySelector("[data-role='confirm']"),
+    cancelBtn: modal.querySelector("[data-role='cancel']"),
+    dismissBtn: modal.querySelector("[data-role='dismiss']"),
+  };
+}
+
+const actionModal = createActionModal();
+
+function showModalError(message) {
+  if (!actionModal.error) return;
+  if (!message) {
+    actionModal.error.textContent = "";
+    actionModal.error.classList.add("hidden");
+    return;
+  }
+  actionModal.error.textContent = message;
+  actionModal.error.classList.remove("hidden");
+}
+
+function setModalSubmitting(isSubmitting) {
+  modalState.isSubmitting = isSubmitting;
+  if (actionModal.confirmBtn instanceof HTMLButtonElement) {
+    actionModal.confirmBtn.disabled = isSubmitting;
+  }
+  if (actionModal.cancelBtn instanceof HTMLButtonElement) {
+    actionModal.cancelBtn.disabled = isSubmitting;
+  }
+  if (actionModal.dismissBtn instanceof HTMLButtonElement) {
+    actionModal.dismissBtn.disabled = isSubmitting;
+  }
+  if (actionModal.paidAtInput instanceof HTMLInputElement) {
+    actionModal.paidAtInput.disabled = isSubmitting || modalState.mode !== "pay";
+  }
+}
+
+function closeActionModal(force = false) {
+  if (modalState.isSubmitting && !force) return;
+  modalState.mode = null;
+  modalState.enrollmentId = null;
+  modalState.isSubmitting = false;
+  actionModal.root.classList.add("hidden");
+  showModalError("");
+  if (actionModal.paidAtInput instanceof HTMLInputElement) {
+    actionModal.paidAtInput.disabled = false;
+    actionModal.paidAtInput.value = "";
+  }
+  if (actionModal.confirmBtn instanceof HTMLButtonElement) {
+    actionModal.confirmBtn.disabled = false;
+  }
+  if (actionModal.cancelBtn instanceof HTMLButtonElement) {
+    actionModal.cancelBtn.disabled = false;
+  }
+  if (actionModal.dismissBtn instanceof HTMLButtonElement) {
+    actionModal.dismissBtn.disabled = false;
+  }
+}
+
+function openPayModal(enrollmentId, studentName) {
+  if (!mustOperator()) return;
+  modalState.mode = "pay";
+  modalState.enrollmentId = enrollmentId;
+  actionModal.title.textContent = "确认报名";
+  actionModal.description.textContent = `请为报名 #${enrollmentId}${studentName ? `（${studentName}）` : ""}填写交费时间。`;
+  actionModal.paidAtWrap.classList.remove("hidden");
+  actionModal.confirmBtn.textContent = "确认报名";
+  showModalError("");
+  setModalSubmitting(false);
+  actionModal.root.classList.remove("hidden");
+  if (actionModal.paidAtInput instanceof HTMLInputElement) {
+    actionModal.paidAtInput.focus();
+  }
+}
+
+function openCancelModal(enrollmentId, studentName) {
+  if (!mustOperator()) return;
+  modalState.mode = "cancel";
+  modalState.enrollmentId = enrollmentId;
+  actionModal.title.textContent = "取消报名";
+  actionModal.description.textContent = `确认取消报名 #${enrollmentId}${studentName ? `（${studentName}）` : ""} 吗？取消后状态将变为“已取消”。`;
+  actionModal.paidAtWrap.classList.add("hidden");
+  actionModal.confirmBtn.textContent = "确认取消";
+  showModalError("");
+  setModalSubmitting(false);
+  actionModal.root.classList.remove("hidden");
+}
+
+function validatePaidAtInput(value) {
+  const trimmed = String(value || "").trim();
+  if (!PAID_AT_INPUT_PATTERN.test(trimmed)) {
+    return "请输入 mm.dd hhmm 格式，例如 04.29 1530";
+  }
+  return "";
+}
+
+async function confirmPayEnrollment(id, paidAt) {
+  await fetchJson(`${API_BASE}/enrollments/${id}/pay`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      operator_name: operatorSelect.value,
+      source: sourceSelect.value,
+      paid_at: paidAt,
+      note: "前端报名管理页面确认报名",
+    }),
+  });
+}
+
+async function confirmCancelEnrollment(id) {
+  await fetchJson(`${API_BASE}/enrollments/${id}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      operator_name: operatorSelect.value,
+      source: sourceSelect.value,
+      note: "前端报名管理页面取消报名",
+    }),
+  });
+}
+
+async function submitActionModal() {
+  if (!mustOperator()) return;
+  const id = Number(modalState.enrollmentId || 0);
+  if (!id) return;
+
+  try {
+    setModalSubmitting(true);
+    showModalError("");
+
+    if (modalState.mode === "pay") {
+      const paidAt = actionModal.paidAtInput instanceof HTMLInputElement ? actionModal.paidAtInput.value.trim() : "";
+      const validationMessage = validatePaidAtInput(paidAt);
+      if (validationMessage) {
+        showModalError(validationMessage);
+        setModalSubmitting(false);
+        return;
+      }
+      await confirmPayEnrollment(id, paidAt);
+    } else if (modalState.mode === "cancel") {
+      await confirmCancelEnrollment(id);
+    } else {
+      setModalSubmitting(false);
+      return;
+    }
+
+    closeActionModal(true);
+    await loadEnrollments();
+  } catch (error) {
+    showModalError(error.message || "操作失败");
+    setModalSubmitting(false);
+  }
+}
+
 async function loadOperators() {
   const result = await fetchJson(`${API_BASE}/operators`);
   operatorSelect.innerHTML = [`<option value=''>请选择</option>`]
@@ -188,25 +408,6 @@ async function loadRules() {
   gradeFilter.innerHTML = [`<option value=''>全部年级</option>`]
     .concat(grades.map((grade) => `<option value='${grade}'>${grade}</option>`))
     .join("");
-}
-
-async function payEnrollment(id) {
-  if (!mustOperator()) return;
-
-  try {
-    await fetchJson(`${API_BASE}/enrollments/${id}/pay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        operator_name: operatorSelect.value,
-        source: sourceSelect.value,
-        note: "前端报名管理页面确认报名",
-      }),
-    });
-    await loadEnrollments();
-  } catch (error) {
-    alert(`确认报名失败: ${error.message}`);
-  }
 }
 
 function totalPages() {
@@ -319,7 +520,7 @@ async function loadEnrollments() {
     enrollmentList.innerHTML = rows
       .map((item) => {
         const isAdjustmentGenerated = Number(item.previous_enrollment_id || 0) > 0;
-        const canPay = item.status === "unconfirmed" && !isAdjustmentGenerated;
+        const canOperate = item.status === "unconfirmed" && !isAdjustmentGenerated;
         const subjects = Array.isArray(item.class_subjects) ? item.class_subjects.join("、") : "-";
         const payable = formatMoney(item.final_price);
         const adjustmentTag = item.adjustment_tag ? `<span class='source-pill'>${item.adjustment_tag}</span>` : "";
@@ -336,11 +537,15 @@ async function loadEnrollments() {
               </div>
               <div class='enrollment-meta'>科目: ${subjects}</div>
               <div class='enrollment-meta'>报价时间: ${formatDateTime(item.created_at)}</div>
+              <div class='enrollment-meta'>交费时间: ${formatPaidAt(item.paid_at)}</div>
               <div class='enrollment-meta'>报价信息: ${renderQuoteInfo(item)}</div>
             </div>
             ${
-              canPay
-                ? `<div class='actions'><button type='button' data-pay-id='${item.id}'>确认报名</button></div>`
+              canOperate
+                ? `<div class='actions inline-actions'>
+                    <button type='button' data-pay-id='${item.id}' data-student-name='${item.student_name || ""}'>确认报名</button>
+                    <button type='button' class='secondary' data-cancel-id='${item.id}' data-student-name='${item.student_name || ""}'>取消报名</button>
+                  </div>`
                 : ""
             }
           </div>
@@ -382,11 +587,39 @@ statusFilter.addEventListener("change", async () => {
 enrollmentList.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
-  const button = target.closest("button[data-pay-id]");
-  if (!button) return;
-  const id = Number(button.getAttribute("data-pay-id"));
-  if (!Number.isFinite(id)) return;
-  await payEnrollment(id);
+
+  const payButton = target.closest("button[data-pay-id]");
+  if (payButton) {
+    const id = Number(payButton.getAttribute("data-pay-id") || 0);
+    if (!Number.isFinite(id) || id <= 0) return;
+    openPayModal(id, payButton.getAttribute("data-student-name") || "");
+    return;
+  }
+
+  const cancelButton = target.closest("button[data-cancel-id]");
+  if (!cancelButton) return;
+  const id = Number(cancelButton.getAttribute("data-cancel-id") || 0);
+  if (!Number.isFinite(id) || id <= 0) return;
+  openCancelModal(id, cancelButton.getAttribute("data-student-name") || "");
+});
+
+actionModal.confirmBtn?.addEventListener("click", submitActionModal);
+actionModal.cancelBtn?.addEventListener("click", closeActionModal);
+actionModal.dismissBtn?.addEventListener("click", closeActionModal);
+actionModal.root.addEventListener("click", (event) => {
+  if (event.target === actionModal.root) {
+    closeActionModal();
+  }
+});
+actionModal.paidAtInput?.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  await submitActionModal();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !actionModal.root.classList.contains("hidden")) {
+    closeActionModal();
+  }
 });
 
 enrollmentPagination?.addEventListener("click", async (event) => {

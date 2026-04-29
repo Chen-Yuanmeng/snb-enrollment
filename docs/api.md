@@ -134,7 +134,7 @@
 ### GET /enrollments
 - 参数（可选）：status, student_id, grade, valid, source, keyword, page（默认1）, page_size（默认20，最大200）, limit（兼容旧参数，传入后按第一页+limit返回）, latest_only（默认 true）
 - keyword 支持：学生姓名模糊匹配；纯数字时按报名ID精确匹配
-- 返回：`data` 为报名列表（含 class_subjects, source, student_name, student_phone, chain_root_enrollment_id, previous_enrollment_id, adjustment_tag），并在顶层返回分页元数据：`total`, `page`, `page_size`
+- 返回：`data` 为报名列表（含 class_subjects, source, student_name, student_phone, chain_root_enrollment_id, previous_enrollment_id, adjustment_tag, paid_at），并在顶层返回分页元数据：`total`, `page`, `page_size`
 - 默认仅返回每条报名链最新节点（`latest_only=true`），用于“报名管理”页避免展示已被后续调整替代的旧记录
 
 ### GET /enrollments/{enrollment_id}
@@ -154,9 +154,15 @@
 
 ## 4. 缴费
 ### POST /enrollments/{enrollment_id}/pay
+- 入参：operator_name, source, paid_at, note（可选）
+- `paid_at` 格式固定为 `mm.dd hhmm`，按 `Asia/Shanghai` 解析，年份固定补为 `2026`
+- 前置：状态必须是 unconfirmed（兼容历史 quoted）
+- 处理：状态改为 confirmed，交费时间转为 UTC 后写入 `paid_at`，并写日志
+
+### POST /enrollments/{enrollment_id}/cancel
 - 入参：operator_name, source, note（可选）
 - 前置：状态必须是 unconfirmed（兼容历史 quoted）
-- 处理：状态改为 confirmed，写日志
+- 处理：状态改为 cancelled，保留记录并写日志
 
 ### POST /enrollments/pay-batch
 - 入参：operator_name, source, enrollment_ids[]

@@ -1,8 +1,11 @@
 from datetime import UTC, datetime
 
+import pytest
+from fastapi import HTTPException
 from app.main import list_enrollments
 from app.models import Enrollment, Student
-from app.services.enrollment_service import get_enrollment_stats
+from app.schemas import EnrollmentCancelRequest, PayRequest
+from app.services.enrollment_service import cancel_enrollment, get_enrollment_stats, pay_enrollment
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -185,6 +188,73 @@ def test_enrollments_default_to_latest_chain_node_only():
         ids = [item["id"] for item in with_history.data]
         assert old.id in ids
         assert new_row.id in ids
+    finally:
+        db.close()
+
+
+def test_pay_enrollment_records_paid_at_in_utc():
+    db = _make_session()
+    try:
+        _seed_enrollments(db)
+        row = db.query(Enrollment).filter(Enrollment.status == "unconfirmed").order_by(Enrollment.id.asc()).first()
+        assert row is not None
+
+        result = pay_enrollment(
+            db,
+            row.id,
+            PayRequest(operator_name="测试", source="测试", paid_at="04.29 1530", note="手动确认"),
+        )
+        db.refresh(row)
+
+        assert result["status"] == "confirmed"
+        assert row.status == "confirmed"
+        assert row.paid_at == datetime(2026, 4, 29, 7, 30)
+        assert row.note == "手动确认"
+    finally:
+        db.close()
+
+
+def test_pay_enrollment_rejects_invalid_paid_at():
+    db = _make_session()
+    try:
+        _seed_enrollments(db)
+        row = db.query(Enrollment).filter(Enrollment.status == "unconfirmed").order_by(Enrollment.id.asc()).first()
+        assert row is not None
+
+        with pytest.raises(HTTPException) as exc:
+            pay_enrollment(
+                db,
+                row.id,
+                PayRequest(operator_name="测试", source="测试", paid_at="13.40 2561"),
+            )
+
+        assert exc.value.status_code == 400
+        assert exc.value.detail["message"] == "输入的日期时间无效"
+    finally:
+        db.close()
+
+
+def test_cancel_enrollment_keeps_row_listed():
+    db = _make_session()
+    try:
+        _seed_enrollments(db)
+        row = db.query(Enrollment).filter(Enrollment.status == "unconfirmed").order_by(Enrollment.id.asc()).first()
+        assert row is not None
+
+        result = cancel_enrollment(
+            db,
+            row.id,
+            EnrollmentCancelRequest(operator_name="测试", source="测试", note="家长暂缓"),
+        )
+        db.refresh(row)
+
+        assert result["status"] == "cancelled"
+        assert row.status == "cancelled"
+        assert row.note == "家长暂缓"
+
+        listed = list_enrollments(status="cancelled", page=1, page_size=20, db=db)
+        assert listed.total == 1
+        assert listed.data[0]["id"] == row.id
     finally:
         db.close()
 

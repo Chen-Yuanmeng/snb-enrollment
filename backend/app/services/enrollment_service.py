@@ -1,17 +1,24 @@
+import re
+from datetime import UTC, datetime
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 from sqlalchemy import desc, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
-from app.constants import ENROLLMENT_STATS_INCLUDED_STATUSES, STATUS_PAID, STATUS_QUOTED
+from app.constants import ENROLLMENT_STATS_INCLUDED_STATUSES, STATUS_CANCELLED, STATUS_PAID, STATUS_QUOTED
 from app.core.datetime_utils import utcnow_naive
 from app.errors import raise_biz_error
 from app.models import Enrollment, Student, StudentHistory
 from app.pricing_engine import build_fingerprint, build_quote
-from app.schemas import BatchPayRequest, EnrollmentCreateRequest, EnrollmentOut, PayRequest
+from app.schemas import BatchPayRequest, EnrollmentCancelRequest, EnrollmentCreateRequest, EnrollmentOut, PayRequest
 from app.services import notification_service
 from app.services.shared_service import get_or_create_student, inject_auto_discounts, log_operation
+
+PAID_AT_DISPLAY_YEAR = 2026
+PAID_AT_TZ = ZoneInfo("Asia/Shanghai")
+PAID_AT_INPUT_PATTERN = re.compile(r"^(?P<month>\d{2})\.(?P<day>\d{2})\s+(?P<hour>\d{2})(?P<minute>\d{2})$")
 
 
 def _render_payment_notice(enrollment: Enrollment, student: Student | None) -> str:
@@ -29,6 +36,25 @@ def _render_payment_notice(enrollment: Enrollment, student: Student | None) -> s
             "状态: 已交费",
         ]
     )
+
+
+def _parse_paid_at_input(value: str) -> datetime:
+    raw = value.strip()
+    matched = PAID_AT_INPUT_PATTERN.fullmatch(raw)
+    if not matched:
+        raise_biz_error(40001, "请输入 mm.dd hhmm 格式，例如 04.29 1530")
+
+    month = int(matched.group("month"))
+    day = int(matched.group("day"))
+    hour = int(matched.group("hour"))
+    minute = int(matched.group("minute"))
+
+    try:
+        local_dt = datetime(PAID_AT_DISPLAY_YEAR, month, day, hour, minute, tzinfo=PAID_AT_TZ)
+    except ValueError:
+        raise_biz_error(40001, "输入的日期时间无效")
+
+    return local_dt.astimezone(UTC).replace(tzinfo=None)
 
 
 def _ensure_student_history_after_payment(db: Session, enrollment: Enrollment) -> None:
@@ -337,6 +363,7 @@ def get_enrollment(db: Session, enrollment_id: int) -> dict[str, Any]:
         "status": row.status,
         "operator_name": row.operator_name,
         "source": row.source,
+        "paid_at": row.paid_at,
         "created_at": row.created_at,
     }
 
@@ -349,6 +376,7 @@ def pay_enrollment(db: Session, enrollment_id: int, payload: PayRequest) -> dict
     if row.status != STATUS_QUOTED:
         raise_biz_error(40005, "状态流转非法")
 
+    row.paid_at = _parse_paid_at_input(payload.paid_at)
     row.status = STATUS_PAID
     row.updated_at = utcnow_naive()
     row.note = payload.note or row.note
@@ -376,6 +404,31 @@ def pay_enrollment(db: Session, enrollment_id: int, payload: PayRequest) -> dict
         # 通知链路异常不影响交费主流程。
         pass
 
+    return {"enrollment_id": row.id, "status": row.status}
+
+
+def cancel_enrollment(db: Session, enrollment_id: int, payload: EnrollmentCancelRequest) -> dict[str, Any]:
+    row = db.get(Enrollment, enrollment_id)
+    if row is None:
+        raise_biz_error(40401, "记录不存在", status_code=404)
+    row = cast(Enrollment, row)
+    if row.status != STATUS_QUOTED:
+        raise_biz_error(40005, "状态流转非法")
+
+    row.status = STATUS_CANCELLED
+    row.updated_at = utcnow_naive()
+    row.note = payload.note or row.note
+
+    log_operation(
+        db,
+        operator_name=payload.operator_name,
+        source=payload.source,
+        action_type="cancel_enrollment",
+        target_type="enrollment",
+        target_id=row.id,
+        result_status="success",
+    )
+    db.commit()
     return {"enrollment_id": row.id, "status": row.status}
 
 

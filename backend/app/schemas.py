@@ -79,7 +79,38 @@ class EnrollmentCreateRequest(QuoteCalculateRequest):
 class PayRequest(BaseModel):
     operator_name: str = Field(min_length=1, max_length=50)
     source: str = Field(min_length=1, max_length=50)
+    paid_at: str = Field(min_length=1, max_length=20)
     note: str | None = None
+
+    @field_validator("paid_at")
+    @classmethod
+    def trim_paid_at(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("paid_at 不能为空")
+        return trimmed
+
+    @field_validator("note")
+    @classmethod
+    def trim_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        return trimmed or None
+
+
+class EnrollmentCancelRequest(BaseModel):
+    operator_name: str = Field(min_length=1, max_length=50)
+    source: str = Field(min_length=1, max_length=50)
+    note: str | None = None
+
+    @field_validator("note")
+    @classmethod
+    def trim_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        return trimmed or None
 
 
 class BatchPayRequest(BaseModel):
@@ -186,6 +217,9 @@ class EnrollmentOut(BaseModel):
     source: str
     quote_valid_until: datetime
     operator_name: str
+    chain_root_enrollment_id: int | None = None
+    previous_enrollment_id: int | None = None
+    paid_at: datetime | None = None
     created_at: datetime
     note: str | None = None
 

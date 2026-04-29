@@ -51,14 +51,19 @@
 - valid BOOLEAN NOT NULL DEFAULT TRUE
 - operator_name VARCHAR(50) NOT NULL
 - source VARCHAR(50) NOT NULL
+- paid_at TIMESTAMP NULL
 - created_at TIMESTAMP NOT NULL DEFAULT NOW()
 - updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 - note TEXT NULL
 
 状态：
-- quoted
-- paid
-- refund_requested
+- unconfirmed
+- confirmed
+- cancelled
+- pending_adjustment
+- adjusted
+- increased
+- partial_refunded
 - refunded
 
 索引：
@@ -73,6 +78,7 @@
 - `class_subjects` 是班型与科目合并后的多选数组。
 - `source` 为来源字段，与 `operator_name` 一起用于业务追踪。
 - `quote_fingerprint` 用于重复提交拦截。
+- `paid_at` 记录交费时间，按 UTC naive 存储，前端统一按北京时间展示。
 
 ## 4. refunds（退费表）
 - id BIGSERIAL PRIMARY KEY
