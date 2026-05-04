@@ -198,6 +198,24 @@ def test_g1_referral_legacy_name_maps_to_unified_discount(monkeypatch):
     assert "老带新28天" not in quote.discount_info
 
 
+def test_g1_ab_english_training_price_has_no_discount():
+    cases = [
+        ("线下", 2400),
+        ("线上", 2400),
+    ]
+    for class_mode, expected_total in cases:
+        req = _base_req(
+            grade="新高一暑",
+            class_mode=class_mode,
+            class_subjects=["英语AB分班集训课"],
+            discounts=[],
+        )
+        quote = build_quote(req, now=datetime.fromisoformat("2026-05-10T12:00:00"))
+        assert quote.base_price == expected_total
+        assert quote.final_price == expected_total
+        assert "早鸟" not in quote.discount_info
+
+
 def test_junior_primary_summer_auto_early_bird_stage2_value():
     req = _base_req(
         grade="初中/小学暑期",

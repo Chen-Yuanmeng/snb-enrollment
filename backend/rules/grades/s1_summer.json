@@ -85,6 +85,12 @@
         "name": "中原领军3 (无语英化)",
         "pricing_strategy": "lingjun24minus2"
       }
+    ],
+    [
+      {
+        "name": "英语AB分班集训课",
+        "pricing_strategy": "yyabfb"
+      }
     ]
   ],
   "constraints": {
@@ -363,6 +369,15 @@
         "moment_200",
         "early_bird_200_100"
       ],
+      "available_discounts_overrides": []
+    },
+    "yyabfb": {
+      "price_type": "fixed_total_by_mode",
+      "offline_total": 2400,
+      "online_total": 2400,
+      "offline_equation": "2400",
+      "online_equation": "2400",
+      "discount_preset_refs": [],
       "available_discounts_overrides": []
     }
   },
