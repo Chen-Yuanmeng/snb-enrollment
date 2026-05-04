@@ -115,7 +115,17 @@
         "pricing_strategy": "default"
       },
       {
+        "name": "语文2",
+        "pricing_strategy": "default"
+      }
+    ]
+    [
+      {
         "name": "生物",
+        "pricing_strategy": "default"
+      },
+      {
+        "name": "生物2",
         "pricing_strategy": "default"
       },
       {
